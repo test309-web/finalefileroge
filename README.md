@@ -16,3 +16,5 @@ cahier charges
 
 https://docs.google.com/presentation/d/1KeTjM1a2zoMQT19mT9Cok_Kb5OrWgrDc/edit?usp=drive_link&ouid=103893303272918989621&rtpof=true&sd=true
  
+Trello 
+https://trello.com/b/AbJbJO0c/eventhub
