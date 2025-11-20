@@ -1,3 +1,4 @@
+
 <?php
 
 use Illuminate\Database\Migrations\Migration;
@@ -14,10 +15,10 @@ return new class extends Migration
             $table->text('description');
             $table->text('content');
             $table->foreignId('teacher_id')->constrained('users');
-            $table->foreignId('lesson_id')->constrained('lessons');
+            $table->foreignId('lesson_id')->constrained('lessons')->onDelete('cascade');
             $table->string('subject');
             $table->string('level');
-            $table->string('file_path')->nullable();
+            $table->string('file_url')->nullable();
             $table->integer('points');
             $table->timestamps();
         });

@@ -31,21 +31,28 @@ class ExerciseController extends Controller
      */
     public function index(Request $request)
     {
-        $user = $request->user();
-        
-        if ($user->isTeacher()) {
-            $exercises = Exercise::where('teacher_id', $user->id)
-                ->with(['lesson'])
-                ->get();
-        } else {
-            $exercises = Exercise::with(['teacher', 'lesson'])
-                ->get();
-        }
+        try {
+            $user = $request->user();
+            
+            if ($user->isTeacher()) {
+                $exercises = Exercise::where('teacher_id', $user->id)
+                    ->with(['lesson'])
+                    ->get();
+            } else {
+                $exercises = Exercise::with(['teacher', 'lesson'])
+                    ->get();
+            }
 
-        return response()->json([
-            'status' => 'success',
-            'exercises' => $exercises
-        ]);
+            return response()->json([
+                'status' => 'success',
+                'exercises' => $exercises
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch exercises: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -76,46 +83,53 @@ class ExerciseController extends Controller
      */
     public function store(Request $request)
     {
-        $user = $request->user();
-        
-        if (!$user->isTeacher()) {
+        try {
+            $user = $request->user();
+            
+            if (!$user->isTeacher()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Only teachers can create exercises'
+                ], 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'title' => 'required|string|max:255',
+                'description' => 'required|string',
+                'content' => 'required|string',
+                'lesson_id' => 'required|exists:lessons,id',
+                'subject' => 'required|string|max:255',
+                'level' => 'required|string|max:255',
+                'points' => 'required|integer|min:0'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json($validator->errors(), 422);
+            }
+
+            $exercise = Exercise::create([
+                'title' => $request->title,
+                'description' => $request->description,
+                'content' => $request->content,
+                'teacher_id' => $user->id,
+                'lesson_id' => $request->lesson_id,
+                'subject' => $request->subject,
+                'level' => $request->level,
+                'points' => $request->points,
+                'file_url' => $request->file_url
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Exercise created successfully',
+                'exercise' => $exercise
+            ], 201);
+        } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Only teachers can create exercises'
-            ], 403);
+                'message' => 'Failed to create exercise: ' . $e->getMessage()
+            ], 500);
         }
-
-        $validator = Validator::make($request->all(), [
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'content' => 'required|string',
-            'lesson_id' => 'required|exists:lessons,id',
-            'subject' => 'required|string|max:255',
-            'level' => 'required|string|max:255',
-            'points' => 'required|integer|min:0'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
-        }
-
-        $exercise = Exercise::create([
-            'title' => $request->title,
-            'description' => $request->description,
-            'content' => $request->content,
-            'teacher_id' => $user->id,
-            'lesson_id' => $request->lesson_id,
-            'subject' => $request->subject,
-            'level' => $request->level,
-            'points' => $request->points,
-            'file_url' => $request->file_url
-        ]);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Exercise created successfully',
-            'exercise' => $exercise
-        ], 201);
     }
 
     /**
@@ -138,65 +152,159 @@ class ExerciseController extends Controller
      */
     public function show($id)
     {
-        $exercise = Exercise::with(['teacher', 'lesson', 'studentPoints.student'])->find($id);
+        try {
+            $exercise = Exercise::with(['teacher', 'lesson', 'studentPoints.student'])->find($id);
 
-        if (!$exercise) {
+            if (!$exercise) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Exercise not found'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'exercise' => $exercise
+            ]);
+        } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Exercise not found'
-            ], 404);
+                'message' => 'Failed to fetch exercise: ' . $e->getMessage()
+            ], 500);
         }
-
-        return response()->json([
-            'status' => 'success',
-            'exercise' => $exercise
-        ]);
     }
 
     /**
-     * @OA\Get(
-     *     path="/api/exercises/search/by",
-     *     summary="Search exercises",
+     * @OA\Put(
+     *     path="/api/exercises/{id}",
+     *     summary="Update exercise",
      *     tags={"Exercises"},
      *     security={{"sanctum":{}}},
      *     @OA\Parameter(
-     *         name="title",
-     *         in="query",
-     *         @OA\Schema(type="string")
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
      *     ),
-     *     @OA\Parameter(
-     *         name="subject",
-     *         in="query",
-     *         @OA\Schema(type="string")
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             @OA\Property(property="title", type="string"),
+     *             @OA\Property(property="description", type="string"),
+     *             @OA\Property(property="content", type="string"),
+     *             @OA\Property(property="lesson_id", type="integer"),
+     *             @OA\Property(property="subject", type="string"),
+     *             @OA\Property(property="level", type="string"),
+     *             @OA\Property(property="points", type="integer")
+     *         )
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Search results"
+     *         description="Exercise updated successfully"
      *     )
      * )
      */
-    public function search(Request $request)
+    public function update(Request $request, $id)
     {
-        $query = Exercise::with(['teacher', 'lesson']);
+        try {
+            $user = $request->user();
+            $exercise = Exercise::find($id);
 
-        if ($request->has('title')) {
-            $query->where('title', 'like', '%' . $request->title . '%');
+            if (!$exercise) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Exercise not found'
+                ], 404);
+            }
+
+            if ($exercise->teacher_id !== $user->id) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized to update this exercise'
+                ], 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'title' => 'sometimes|string|max:255',
+                'description' => 'sometimes|string',
+                'content' => 'sometimes|string',
+                'lesson_id' => 'sometimes|exists:lessons,id',
+                'subject' => 'sometimes|string|max:255',
+                'level' => 'sometimes|string|max:255',
+                'points' => 'sometimes|integer|min:0'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json($validator->errors(), 422);
+            }
+
+            $exercise->update($request->all());
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Exercise updated successfully',
+                'exercise' => $exercise
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to update exercise: ' . $e->getMessage()
+            ], 500);
         }
+    }
 
-        if ($request->has('subject')) {
-            $query->where('subject', 'like', '%' . $request->subject . '%');
+    /**
+     * @OA\Delete(
+     *     path="/api/exercises/{id}",
+     *     summary="Delete exercise",
+     *     tags={"Exercises"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Exercise deleted successfully"
+     *     )
+     * )
+     */
+    public function destroy(Request $request, $id)
+    {
+        try {
+            $user = $request->user();
+            $exercise = Exercise::find($id);
+
+            if (!$exercise) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Exercise not found'
+                ], 404);
+            }
+
+            if ($exercise->teacher_id !== $user->id) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized to delete this exercise'
+                ], 403);
+            }
+
+            StudentPoint::where('exercise_id', $exercise->id)->delete();
+
+            $exercise->delete();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Exercise deleted successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to delete exercise: ' . $e->getMessage()
+            ], 500);
         }
-
-        if ($request->has('level')) {
-            $query->where('level', $request->level);
-        }
-
-        $exercises = $query->get();
-
-        return response()->json([
-            'status' => 'success',
-            'exercises' => $exercises
-        ]);
     }
 
     /**
@@ -223,37 +331,97 @@ class ExerciseController extends Controller
      */
     public function assignPoints(Request $request)
     {
-        $user = $request->user();
-        
-        if (!$user->isTeacher()) {
+        try {
+            $user = $request->user();
+            
+            if (!$user->isTeacher()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Only teachers can assign points'
+                ], 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'student_id' => 'required|exists:users,id',
+                'exercise_id' => 'required|exists:exercises,id',
+                'points_earned' => 'required|integer|min:0',
+                'teacher_notes' => 'sometimes|string'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json($validator->errors(), 422);
+            }
+
+            $studentPoint = StudentPoint::create([
+                'student_id' => $request->student_id,
+                'exercise_id' => $request->exercise_id,
+                'points_earned' => $request->points_earned,
+                'teacher_notes' => $request->teacher_notes
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Points assigned successfully',
+                'student_point' => $studentPoint
+            ], 201);
+        } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Only teachers can assign points'
-            ], 403);
+                'message' => 'Failed to assign points: ' . $e->getMessage()
+            ], 500);
         }
+    }
 
-        $validator = Validator::make($request->all(), [
-            'student_id' => 'required|exists:users,id',
-            'exercise_id' => 'required|exists:exercises,id',
-            'points_earned' => 'required|integer|min:0',
-            'teacher_notes' => 'sometimes|string'
-        ]);
+    /**
+     * @OA\Get(
+     *     path="/api/exercises/search/by",
+     *     summary="Search exercises",
+     *     tags={"Exercises"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="title",
+     *         in="query",
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Parameter(
+     *         name="subject",
+     *         in="query",
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Search results"
+     *     )
+     * )
+     */
+    public function search(Request $request)
+    {
+        try {
+            $query = Exercise::with(['teacher', 'lesson']);
 
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+            if ($request->has('title')) {
+                $query->where('title', 'like', '%' . $request->title . '%');
+            }
+
+            if ($request->has('subject')) {
+                $query->where('subject', 'like', '%' . $request->subject . '%');
+            }
+
+            if ($request->has('level')) {
+                $query->where('level', $request->level);
+            }
+
+            $exercises = $query->get();
+
+            return response()->json([
+                'status' => 'success',
+                'exercises' => $exercises
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Search failed: ' . $e->getMessage()
+            ], 500);
         }
-
-        $studentPoint = StudentPoint::create([
-            'student_id' => $request->student_id,
-            'exercise_id' => $request->exercise_id,
-            'points_earned' => $request->points_earned,
-            'teacher_notes' => $request->teacher_notes
-        ]);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Points assigned successfully',
-            'student_point' => $studentPoint
-        ], 201);
     }
 }

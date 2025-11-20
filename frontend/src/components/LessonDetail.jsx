@@ -1,14 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { getLesson } from '../services/lessonService';
+import { useParams, useNavigate } from 'react-router-dom';
+import { getLesson, updateLesson, deleteLesson } from '../services/lessonService';
 import { getCurrentUser } from '../services/authService';
 
 const LessonDetail = () => {
     const { id } = useParams();
+    const navigate = useNavigate();
     const [lesson, setLesson] = useState(null);
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState(null);
+    const [editing, setEditing] = useState(false);
+    const [editForm, setEditForm] = useState({});
+    const [message, setMessage] = useState('');
 
     useEffect(() => {
         const fetchLesson = async () => {
@@ -18,6 +22,7 @@ const LessonDetail = () => {
 
                 const lessonData = await getLesson(id);
                 setLesson(lessonData.lesson);
+                setEditForm(lessonData.lesson);
                 setLoading(false);
             } catch (error) {
                 console.error("Failed to fetch lesson", error);
@@ -26,6 +31,50 @@ const LessonDetail = () => {
         };
         fetchLesson();
     }, [id]);
+
+    const handleEdit = () => {
+        setEditing(true);
+    };
+
+    const handleCancelEdit = () => {
+        setEditing(false);
+        setEditForm(lesson);
+        setMessage('');
+    };
+
+    const handleInputChange = (e) => {
+        setEditForm({
+            ...editForm,
+            [e.target.name]: e.target.value
+        });
+    };
+
+    const handleUpdate = async (e) => {
+        e.preventDefault();
+        try {
+            const result = await updateLesson(lesson.id, editForm);
+            setLesson(result.lesson);
+            setEditing(false);
+            setMessage('Lesson updated successfully!');
+            setTimeout(() => setMessage(''), 3000);
+        } catch (error) {
+            setMessage('Failed to update lesson: ' + (error.message || 'Unknown error'));
+        }
+    };
+
+    const handleDelete = async () => {
+        if (window.confirm('Are you sure you want to delete this lesson? This action cannot be undone.')) {
+            try {
+                await deleteLesson(lesson.id);
+                setMessage('Lesson deleted successfully!');
+                setTimeout(() => {
+                    navigate('/lessons');
+                }, 2000);
+            } catch (error) {
+                setMessage('Failed to delete lesson: ' + (error.message || 'Unknown error'));
+            }
+        }
+    };
 
     if (loading) {
         return (
@@ -61,13 +110,12 @@ const LessonDetail = () => {
         );
     }
 
-    const canEditDelete = user && (user.role === 'admin' || (user.role === 'teacher' && lesson.teacher_id === user.id));
+    const canEditDelete = user && user.role === 'teacher' && lesson.teacher_id === user.id;
 
     return (
         <div className="container-fluid bg-light min-vh-100">
             <div className="row">
                 <div className="col-12">
-                    {/* Navigation Header */}
                     <nav className="navbar navbar-expand-lg navbar-dark bg-primary shadow">
                         <div className="container">
                             <a className="navbar-brand fw-bold" href="/lessons">
@@ -82,34 +130,84 @@ const LessonDetail = () => {
                         </div>
                     </nav>
 
-                    {/* Main Content */}
+                    {message && (
+                        <div className="container mt-3">
+                            <div className={`alert ${message.includes('successfully') ? 'alert-success' : 'alert-danger'} alert-dismissible fade show`}>
+                                {message}
+                                <button type="button" className="btn-close" onClick={() => setMessage('')}></button>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="container my-4">
                         <div className="row justify-content-center">
                             <div className="col-12 col-lg-10 col-xl-8">
-                                {/* Lesson Card */}
                                 <div className="card shadow border-0 rounded-3">
                                     <div className="card-header bg-primary text-white py-4 rounded-top-3">
                                         <div className="row align-items-center">
                                             <div className="col-12 col-md-8">
-                                                <h1 className="h2 mb-2 fw-bold">{lesson.title}</h1>
-                                                <p className="mb-0 fs-5 opacity-75">{lesson.description}</p>
+                                                {editing ? (
+                                                    <input
+                                                        type="text"
+                                                        name="title"
+                                                        value={editForm.title || ''}
+                                                        onChange={handleInputChange}
+                                                        className="form-control form-control-lg fw-bold"
+                                                    />
+                                                ) : (
+                                                    <h1 className="h2 mb-2 fw-bold">{lesson.title}</h1>
+                                                )}
+                                                {editing ? (
+                                                    <textarea
+                                                        name="description"
+                                                        value={editForm.description || ''}
+                                                        onChange={handleInputChange}
+                                                        className="form-control mt-2"
+                                                        rows="2"
+                                                    />
+                                                ) : (
+                                                    <p className="mb-0 fs-5 opacity-75">{lesson.description}</p>
+                                                )}
                                             </div>
                                             <div className="col-12 col-md-4 text-md-end mt-3 mt-md-0">
-                                                <div className="badge bg-light text-dark fs-6 mb-2 px-3 py-2">
-                                                    {lesson.level}
-                                                </div>
+                                                {editing ? (
+                                                    <select
+                                                        name="level"
+                                                        value={editForm.level || ''}
+                                                        onChange={handleInputChange}
+                                                        className="form-select mb-2"
+                                                    >
+                                                        <option value="beginner">Beginner</option>
+                                                        <option value="intermediate">Intermediate</option>
+                                                        <option value="advanced">Advanced</option>
+                                                    </select>
+                                                ) : (
+                                                    <div className="badge bg-light text-dark fs-6 mb-2 px-3 py-2">
+                                                        {lesson.level}
+                                                    </div>
+                                                )}
                                                 <p className="mb-1 text-white">
                                                     <strong>By:</strong> {lesson.teacher?.name}
                                                 </p>
-                                                <p className="mb-0 text-white">
-                                                    <strong>Subject:</strong> {lesson.subject}
-                                                </p>
+                                                {editing ? (
+                                                    <input
+                                                        type="text"
+                                                        name="subject"
+                                                        value={editForm.subject || ''}
+                                                        onChange={handleInputChange}
+                                                        className="form-control"
+                                                        placeholder="Subject"
+                                                    />
+                                                ) : (
+                                                    <p className="mb-0 text-white">
+                                                        <strong>Subject:</strong> {lesson.subject}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
                                     
                                     <div className="card-body p-4 p-md-5">
-                                        {/* Embedded Content */}
                                         {lesson.file_url && (
                                             <div className="mb-5">
                                                 <h3 className="mb-3 text-primary">
@@ -124,6 +222,16 @@ const LessonDetail = () => {
                                                         allowFullScreen
                                                     />
                                                 </div>
+                                                {editing && (
+                                                    <input
+                                                        type="url"
+                                                        name="file_url"
+                                                        value={editForm.file_url || ''}
+                                                        onChange={handleInputChange}
+                                                        className="form-control mt-2"
+                                                        placeholder="Resource URL"
+                                                    />
+                                                )}
                                                 <div className="mt-2 text-center">
                                                     <small className="text-muted">
                                                         Embedded content from: {lesson.file_url}
@@ -132,20 +240,29 @@ const LessonDetail = () => {
                                             </div>
                                         )}
 
-                                        {/* Lesson Content */}
                                         <div className="mb-5">
                                             <h3 className="mb-3 text-primary">
                                                 <i className="fas fa-book me-2"></i>
                                                 Lesson Content
                                             </h3>
-                                            <div className="p-4 bg-light rounded shadow-sm">
-                                                <div className="lesson-content fs-5 lh-base">
-                                                    {lesson.content}
+                                            {editing ? (
+                                                <textarea
+                                                    name="content"
+                                                    value={editForm.content || ''}
+                                                    onChange={handleInputChange}
+                                                    className="form-control"
+                                                    rows="12"
+                                                    placeholder="Lesson content..."
+                                                />
+                                            ) : (
+                                                <div className="p-4 bg-light rounded shadow-sm">
+                                                    <div className="lesson-content fs-5 lh-base">
+                                                        {lesson.content}
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
 
-                                        {/* Admin/Teacher Actions */}
                                         {canEditDelete && (
                                             <div className="mb-4">
                                                 <h4 className="mb-3 text-primary">
@@ -153,19 +270,45 @@ const LessonDetail = () => {
                                                     Management Actions
                                                 </h4>
                                                 <div className="d-grid gap-2 d-md-flex">
-                                                    <button className="btn btn-warning btn-lg me-md-2">
-                                                        <i className="fas fa-edit me-2"></i>
-                                                        Edit Lesson
-                                                    </button>
-                                                    <button className="btn btn-danger btn-lg">
-                                                        <i className="fas fa-trash me-2"></i>
-                                                        Delete Lesson
-                                                    </button>
+                                                    {editing ? (
+                                                        <>
+                                                            <button 
+                                                                onClick={handleUpdate}
+                                                                className="btn btn-success btn-lg me-md-2"
+                                                            >
+                                                                <i className="fas fa-save me-2"></i>
+                                                                Save Changes
+                                                            </button>
+                                                            <button 
+                                                                onClick={handleCancelEdit}
+                                                                className="btn btn-secondary btn-lg"
+                                                            >
+                                                                <i className="fas fa-times me-2"></i>
+                                                                Cancel
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button 
+                                                                onClick={handleEdit}
+                                                                className="btn btn-warning btn-lg me-md-2"
+                                                            >
+                                                                <i className="fas fa-edit me-2"></i>
+                                                                Edit Lesson
+                                                            </button>
+                                                            <button 
+                                                                onClick={handleDelete}
+                                                                className="btn btn-danger btn-lg"
+                                                            >
+                                                                <i className="fas fa-trash me-2"></i>
+                                                                Delete Lesson
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
 
-                                        {/* Related Exercises */}
                                         {lesson.exercises && lesson.exercises.length > 0 && (
                                             <div className="mt-5">
                                                 <h3 className="mb-4 text-primary">

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Lesson;
 use App\Models\Exercise;
+use App\Models\StudentPoint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -84,10 +85,10 @@ class LessonController extends Controller
         try {
             $user = $request->user();
             
-            if (!$user->isTeacher() && !$user->isAdmin()) {
+            if (!$user->isTeacher()) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Only teachers and admins can create lessons'
+                    'message' => 'Only teachers can create lessons'
                 ], 403);
             }
 
@@ -107,7 +108,7 @@ class LessonController extends Controller
                 'title' => $request->title,
                 'description' => $request->description,
                 'content' => $request->content,
-                'teacher_id' => $user->isTeacher() ? $user->id : $request->teacher_id ?? $user->id,
+                'teacher_id' => $user->id,
                 'subject' => $request->subject,
                 'level' => $request->level,
                 'file_url' => $request->file_url
@@ -210,8 +211,7 @@ class LessonController extends Controller
                 ], 404);
             }
 
-            // Admin يمكنه تعديل أي درس، Teacher يمكنه تعديل دروسه فقط
-            if (!$user->isAdmin() && $lesson->teacher_id !== $user->id) {
+            if ($lesson->teacher_id !== $user->id) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Unauthorized to update this lesson'
@@ -277,8 +277,7 @@ class LessonController extends Controller
                 ], 404);
             }
 
-            // Admin يمكنه حذف أي درس، Teacher يمكنه حذف دروسه فقط
-            if (!$user->isAdmin() && $lesson->teacher_id !== $user->id) {
+            if ($lesson->teacher_id !== $user->id) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Unauthorized to delete this lesson'

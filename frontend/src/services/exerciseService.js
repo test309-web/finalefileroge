@@ -28,6 +28,24 @@ export const createExercise = async (exerciseData) => {
     }
 };
 
+export const updateExercise = async (id, exerciseData) => {
+    try {
+        const response = await API.put(`/exercises/${id}`, exerciseData);
+        return response.data;
+    } catch (error) {
+        throw error.response?.data || { message: 'Network error' };
+    }
+};
+
+export const deleteExercise = async (id) => {
+    try {
+        const response = await API.delete(`/exercises/${id}`);
+        return response.data;
+    } catch (error) {
+        throw error.response?.data || { message: 'Network error' };
+    }
+};
+
 export const searchExercises = async (searchData) => {
     try {
         const response = await API.get('/exercises/search/by', { params: searchData });

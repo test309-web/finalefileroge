@@ -28,6 +28,24 @@ export const createLesson = async (lessonData) => {
     }
 };
 
+export const updateLesson = async (id, lessonData) => {
+    try {
+        const response = await API.put(`/lessons/${id}`, lessonData);
+        return response.data;
+    } catch (error) {
+        throw error.response?.data || { message: 'Network error' };
+    }
+};
+
+export const deleteLesson = async (id) => {
+    try {
+        const response = await API.delete(`/lessons/${id}`);
+        return response.data;
+    } catch (error) {
+        throw error.response?.data || { message: 'Network error' };
+    }
+};
+
 export const searchLessons = async (searchData) => {
     try {
         const response = await API.get('/lessons/search/by', { params: searchData });
