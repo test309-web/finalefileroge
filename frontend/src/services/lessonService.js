@@ -1,4 +1,3 @@
-
 import API from './api';
 
 export const getLessons = async () => {
@@ -49,6 +48,15 @@ export const deleteLesson = async (id) => {
 export const searchLessons = async (searchData) => {
     try {
         const response = await API.get('/lessons/search/by', { params: searchData });
+        return response.data;
+    } catch (error) {
+        throw error.response?.data || { message: 'Network error' };
+    }
+};
+
+export const getTeacherLessons = async () => {
+    try {
+        const response = await API.get('/teacher/lessons');
         return response.data;
     } catch (error) {
         throw error.response?.data || { message: 'Network error' };

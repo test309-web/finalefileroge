@@ -167,3 +167,35 @@ body {
 .table tr:hover {
   background-color: #f8f9fa;
 }
+/* تحسينات التصميم */
+.shadow-hover {
+    transition: all 0.3s ease;
+}
+
+.shadow-hover:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+}
+
+.card {
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.badge {
+    font-size: 0.8em;
+    padding: 0.5em 0.8em;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85em;
+    letter-spacing: 0.5px;
+}

@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { createLesson } from '../services/lessonService';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { getLesson, updateLesson } from '../services/lessonService';
+import { getCurrentUser } from '../services/authService';
 
-const CreateLesson = () => {
+const EditLesson = () => {
+    const { id } = useParams();
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
         title: '',
@@ -12,9 +14,50 @@ const CreateLesson = () => {
     });
     const [validationErrors, setValidationErrors] = useState({});
     const [loading, setLoading] = useState(false);
+    const [currentUser, setCurrentUser] = useState(null);
+    const [lesson, setLesson] = useState(null);
+    const [authChecked, setAuthChecked] = useState(false);
 
-    const handleBack = () => {
-        navigate('/dashboard'); // الرجوع للصفحة الرئيسية مباشرة
+    useEffect(() => {
+        const user = getCurrentUser();
+        setCurrentUser(user);
+        setAuthChecked(true);
+    }, []);
+
+    useEffect(() => {
+        if (authChecked && currentUser) {
+            loadLesson();
+        }
+    }, [authChecked, currentUser, id]);
+
+    const loadLesson = async () => {
+        try {
+            const lessonData = await getLesson(id);
+            if (lessonData.status === 'success') {
+                setLesson(lessonData.data);
+                
+                // التحقق من الصلاحيات بعد تحميل البيانات والمستخدم
+                if (lessonData.data.teacher_id !== currentUser.id && currentUser.role !== 'admin') {
+                    alert('You are not authorized to edit this lesson');
+                    navigate('/dashboard');
+                    return;
+                }
+                
+                setFormData({
+                    title: lessonData.data.title,
+                    description: lessonData.data.description,
+                    content: lessonData.data.content,
+                    level: lessonData.data.level
+                });
+            } else {
+                alert('Lesson not found');
+                navigate('/dashboard');
+            }
+        } catch (error) {
+            console.error('Error loading lesson:', error);
+            alert('Error loading lesson');
+            navigate('/dashboard');
+        }
     };
 
     const handleChange = (e) => {
@@ -27,24 +70,39 @@ const CreateLesson = () => {
         setValidationErrors({});
         
         try {
-            await createLesson(formData);
-            navigate('/lessons');
+            await updateLesson(id, formData);
+            navigate('/dashboard');
         } catch (error) {
             if (error.errors) {
                 setValidationErrors(error.errors);
             } else {
-                alert(error.message || 'Failed to create lesson');
+                alert(error.message || 'Failed to update lesson');
             }
         } finally {
             setLoading(false);
         }
     }
 
+    const handleBack = () => {
+        navigate('/dashboard');
+    }
+
+    if (!authChecked || !lesson) {
+        return (
+            <div className="container mt-4">
+                <div className="text-center">
+                    <div className="spinner-border" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="container mt-4">
             <div className="row justify-content-center">
                 <div className="col-12 col-md-8 col-lg-6">
-                    {/* Back Button */}
                     <button 
                         className="btn btn-outline-secondary mb-3"
                         onClick={handleBack}
@@ -56,8 +114,8 @@ const CreateLesson = () => {
                     <div className="card shadow">
                         <div className="card-header bg-primary text-white">
                             <h2 className="mb-0">
-                                <i className="fas fa-plus-circle me-2"></i>
-                                Create New Lesson
+                                <i className="fas fa-edit me-2"></i>
+                                Edit Lesson
                             </h2>
                         </div>
                         <div className="card-body p-4">
@@ -68,7 +126,6 @@ const CreateLesson = () => {
                                         type="text" 
                                         name="title" 
                                         className={`form-control ${validationErrors.title ? 'is-invalid' : ''}`}
-                                        placeholder="Enter lesson title"
                                         value={formData.title}
                                         onChange={handleChange}
                                         required 
@@ -84,7 +141,6 @@ const CreateLesson = () => {
                                         name="description" 
                                         className={`form-control ${validationErrors.description ? 'is-invalid' : ''}`}
                                         rows="3"
-                                        placeholder="Enter lesson description"
                                         value={formData.description}
                                         onChange={handleChange}
                                         required 
@@ -100,7 +156,6 @@ const CreateLesson = () => {
                                         name="content" 
                                         className={`form-control ${validationErrors.content ? 'is-invalid' : ''}`}
                                         rows="6"
-                                        placeholder="Enter lesson content"
                                         value={formData.content}
                                         onChange={handleChange}
                                         required 
@@ -110,7 +165,7 @@ const CreateLesson = () => {
                                     }
                                 </div>
                                 
-                                <div className="mb-4">
+                                <div className="mb-3">
                                     <label htmlFor="level" className="form-label">Level</label>
                                     <select 
                                         name="level" 
@@ -132,13 +187,13 @@ const CreateLesson = () => {
                                     >
                                         {loading ? (
                                             <>
-                                                <span className="spinner-border spinner-border-sm me-2" role="status"></span>
-                                                Creating...
+                                                <span className="spinner-border spinner-border-sm me-2"></span>
+                                                Updating...
                                             </>
                                         ) : (
                                             <>
                                                 <i className="fas fa-save me-2"></i>
-                                                Create Lesson
+                                                Update Lesson
                                             </>
                                         )}
                                     </button>
@@ -159,4 +214,4 @@ const CreateLesson = () => {
     );
 }
 
-export default CreateLesson;
+export default EditLesson;

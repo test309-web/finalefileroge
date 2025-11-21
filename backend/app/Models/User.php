@@ -38,9 +38,9 @@ class User extends Authenticatable
         return $this->hasMany(Exercise::class, 'teacher_id');
     }
 
-    public function studentPoints()
+    public function isAdmin()
     {
-        return $this->hasMany(StudentPoint::class, 'student_id');
+        return $this->role === 'admin';
     }
 
     public function isTeacher()
@@ -51,10 +51,5 @@ class User extends Authenticatable
     public function isStudent()
     {
         return $this->role === 'student';
-    }
-
-    public function isAdmin()
-    {
-        return $this->role === 'admin';
     }
 }

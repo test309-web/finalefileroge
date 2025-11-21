@@ -1,109 +1,162 @@
-
 import React, { useState, useEffect } from 'react';
-import { getExercises, searchExercises } from '../services/exerciseService';
+import { Link, useNavigate } from 'react-router-dom';
+import { getExercises, deleteExercise } from '../services/exerciseService';
+import { getCurrentUser } from '../services/authService';
 
 const Exercises = () => {
     const [exercises, setExercises] = useState([]);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [currentUser, setCurrentUser] = useState(null);
+    const navigate = useNavigate();
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const userData = JSON.parse(localStorage.getItem('user'));
-                setUser(userData);
-
-                const exercisesData = await getExercises();
-                setExercises(exercisesData.exercises || []);
-            } catch (error) {
-                console.error("Failed to fetch exercises", error);
-            }
-        };
-        fetchData();
+        const user = getCurrentUser();
+        setCurrentUser(user);
+        loadExercises();
     }, []);
 
-    const handleSearch = async (e) => {
-        e.preventDefault();
+    const handleBack = () => {
+        navigate(-1);
+    };
+
+    const loadExercises = async () => {
         try {
-            const searchData = {};
-            if (searchTerm) {
-                searchData.title = searchTerm;
-            }
-            const result = await searchExercises(searchData);
-            setExercises(result.exercises || []);
+            const exercisesData = await getExercises();
+            setExercises(exercisesData.data || []);
         } catch (error) {
-            console.error("Search failed", error);
+            console.error('Error loading exercises:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
+    const handleDeleteExercise = async (exerciseId) => {
+        if (window.confirm('Are you sure you want to delete this exercise?')) {
+            try {
+                await deleteExercise(exerciseId);
+                loadExercises();
+            } catch (error) {
+                alert('Error deleting exercise');
+            }
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="container mt-4">
+                <div className="text-center">
+                    <div className="spinner-border" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="container mt-4">
-            <nav className="navbar navbar-light bg-light mb-4">
-                <div className="container-fluid">
-                    <a className="navbar-brand" href="/dashboard">← Back to Dashboard</a>
-                    <form className="d-flex" onSubmit={handleSearch}>
-                        <input 
-                            className="form-control me-2" 
-                            type="search" 
-                            placeholder="Search exercises..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                        <button className="btn btn-outline-success" type="submit">Search</button>
-                    </form>
-                </div>
-            </nav>
-
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <h1>All Exercises</h1>
-                {user && user.role === 'teacher' && (
-                    <a href="/exercises/create" className="btn btn-primary">Create New Exercise</a>
-                )}
-            </div>
-
             <div className="row">
-                {exercises.map(exercise => (
-                    <div key={exercise.id} className="col-md-6 mb-4">
-                        <div className="card h-100">
-                            <div className="card-body">
-                                <h5 className="card-title">{exercise.title}</h5>
-                                <p className="card-text">{exercise.description}</p>
-                                <div className="mb-2">
-                                    <small className="text-muted">
-                                        Subject: {exercise.subject} | Level: {exercise.level}
-                                    </small>
-                                </div>
-                                <div className="mb-2">
-                                    <small className="text-muted">
-                                        Points: {exercise.points} | Teacher: {exercise.teacher ? exercise.teacher.name : 'Unknown'}
-                                    </small>
-                                </div>
-                                {exercise.lesson && (
-                                    <div className="mb-2">
-                                        <small className="text-muted">
-                                            Lesson: {exercise.lesson.title}
-                                        </small>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="card-footer">
-                                <a href={`/exercises/${exercise.id}`} className="btn btn-outline-primary btn-sm">
-                                    View Details
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+                <div className="col-12">
+                    <button 
+                        className="btn btn-outline-secondary mb-3"
+                        onClick={handleBack}
+                    >
+                        <i className="fas fa-arrow-left me-2"></i>
+                        Back
+                    </button>
 
-            {exercises.length === 0 && (
-                <div className="text-center mt-5">
-                    <h3>No exercises found</h3>
-                    <p>Try adjusting your search terms or create a new exercise.</p>
+                    <div className="d-flex justify-content-between align-items-center mb-4">
+                        <h1>
+                            <i className="fas fa-tasks me-2"></i>
+                            Exercises
+                        </h1>
+                        {(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && (
+                            <Link to="/exercises/create" className="btn btn-primary">
+                                <i className="fas fa-plus me-2"></i>
+                                Create Exercise
+                            </Link>
+                        )}
+                    </div>
+
+                    <div className="row">
+                        {exercises.map(exercise => (
+                            <div key={exercise.id} className="col-md-6 col-lg-4 mb-4">
+                                <div className="card h-100 shadow-sm">
+                                    <div className="card-body">
+                                        <h5 className="card-title">{exercise.title}</h5>
+                                        <p className="card-text text-muted">{exercise.description}</p>
+                                        <div className="mb-2">
+                                            <span className={`badge ${
+                                                exercise.level === 'beginner' ? 'bg-success' : 
+                                                exercise.level === 'intermediate' ? 'bg-warning' : 'bg-danger'
+                                            } me-2`}>
+                                                {exercise.level}
+                                            </span>
+                                            <span className="badge bg-info">
+                                                {exercise.points} Points
+                                            </span>
+                                        </div>
+                                        <p className="card-text">
+                                            <small className="text-muted">
+                                                By: {exercise.teacher?.name || 'Unknown'}
+                                            </small>
+                                        </p>
+                                        {exercise.lesson && (
+                                            <p className="card-text">
+                                                <small className="text-muted">
+                                                    Lesson: {exercise.lesson.title}
+                                                </small>
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="card-footer bg-transparent">
+                                        <div className="d-flex justify-content-between">
+                                            <Link 
+                                                to={`/exercises/${exercise.id}`} 
+                                                className="btn btn-outline-primary btn-sm"
+                                            >
+                                                View
+                                            </Link>
+                                            {(currentUser?.role === 'admin' || 
+                                              (currentUser?.role === 'teacher' && exercise.teacher_id === currentUser.id)) && (
+                                                <div>
+                                                    <Link 
+                                                        to={`/exercises/edit/${exercise.id}`}
+                                                        className="btn btn-outline-warning btn-sm me-2"
+                                                    >
+                                                        <i className="fas fa-edit"></i>
+                                                    </Link>
+                                                    <button 
+                                                        className="btn btn-outline-danger btn-sm"
+                                                        onClick={() => handleDeleteExercise(exercise.id)}
+                                                    >
+                                                        <i className="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {exercises.length === 0 && (
+                        <div className="text-center py-5">
+                            <i className="fas fa-tasks fa-3x text-muted mb-3"></i>
+                            <h4>No exercises available</h4>
+                            <p className="text-muted">Start by creating your first exercise.</p>
+                            {(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && (
+                                <Link to="/exercises/create" className="btn btn-primary">
+                                    Create First Exercise
+                                </Link>
+                            )}
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
         </div>
     );
-};
+}
 
 export default Exercises;

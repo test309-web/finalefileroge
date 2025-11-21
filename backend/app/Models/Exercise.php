@@ -13,12 +13,11 @@ class Exercise extends Model
         'title',
         'description',
         'content',
-        'teacher_id',
-        'lesson_id',
-        'subject',
+        'solution',
         'level',
-        'file_path',
-        'points'
+        'points',
+        'lesson_id',
+        'teacher_id'
     ];
 
     public function teacher()
@@ -29,10 +28,5 @@ class Exercise extends Model
     public function lesson()
     {
         return $this->belongsTo(Lesson::class);
-    }
-
-    public function studentPoints()
-    {
-        return $this->hasMany(StudentPoint::class);
     }
 }

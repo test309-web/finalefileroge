@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { createExercise } from '../services/exerciseService';
+import { useParams, useNavigate } from 'react-router-dom';
+import { getExercise, updateExercise } from '../services/exerciseService';
 import { getLessons } from '../services/lessonService';
 import { getCurrentUser } from '../services/authService';
 
-const CreateExercise = () => {
+const EditExercise = () => {
+    const { id } = useParams();
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
         title: '',
@@ -19,18 +20,59 @@ const CreateExercise = () => {
     const [validationErrors, setValidationErrors] = useState({});
     const [loading, setLoading] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
+    const [exercise, setExercise] = useState(null);
+    const [authChecked, setAuthChecked] = useState(false);
 
     useEffect(() => {
         const user = getCurrentUser();
         setCurrentUser(user);
-        loadLessons();
+        setAuthChecked(true);
     }, []);
+
+    useEffect(() => {
+        if (authChecked && currentUser) {
+            loadExercise();
+            loadLessons();
+        }
+    }, [authChecked, currentUser, id]);
+
+    const loadExercise = async () => {
+        try {
+            const exerciseData = await getExercise(id);
+            if (exerciseData.status === 'success') {
+                setExercise(exerciseData.data);
+                
+                // التحقق من الصلاحيات بعد تحميل البيانات والمستخدم
+                if (exerciseData.data.teacher_id !== currentUser.id && currentUser.role !== 'admin') {
+                    alert('You are not authorized to edit this exercise');
+                    navigate('/dashboard');
+                    return;
+                }
+                
+                setFormData({
+                    title: exerciseData.data.title,
+                    description: exerciseData.data.description,
+                    content: exerciseData.data.content,
+                    solution: exerciseData.data.solution,
+                    level: exerciseData.data.level,
+                    points: exerciseData.data.points,
+                    lesson_id: exerciseData.data.lesson_id || ''
+                });
+            } else {
+                alert('Exercise not found');
+                navigate('/dashboard');
+            }
+        } catch (error) {
+            console.error('Error loading exercise:', error);
+            alert('Error loading exercise');
+            navigate('/dashboard');
+        }
+    };
 
     const loadLessons = async () => {
         try {
             let lessonsData;
-            if (currentUser?.role === 'teacher') {
-                // للمعلم: جلب فقط دروسه
+            if (currentUser.role === 'teacher') {
                 const response = await fetch('http://127.0.0.1:8000/api/teacher/lessons', {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -39,7 +81,6 @@ const CreateExercise = () => {
                 });
                 lessonsData = await response.json();
             } else {
-                // للطالب أو المدير: جلب جميع الدروس
                 lessonsData = await getLessons();
             }
             
@@ -49,10 +90,6 @@ const CreateExercise = () => {
         } catch (error) {
             console.error('Error loading lessons:', error);
         }
-    };
-
-    const handleBack = () => {
-        navigate('/dashboard');
     };
 
     const handleChange = (e) => {
@@ -65,17 +102,33 @@ const CreateExercise = () => {
         setValidationErrors({});
         
         try {
-            await createExercise(formData);
-            navigate('/exercises');
+            await updateExercise(id, formData);
+            navigate('/dashboard');
         } catch (error) {
             if (error.errors) {
                 setValidationErrors(error.errors);
             } else {
-                alert(error.message || 'Failed to create exercise');
+                alert(error.message || 'Failed to update exercise');
             }
         } finally {
             setLoading(false);
         }
+    }
+
+    const handleBack = () => {
+        navigate('/dashboard');
+    }
+
+    if (!authChecked || !exercise) {
+        return (
+            <div className="container mt-4">
+                <div className="text-center">
+                    <div className="spinner-border" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -91,10 +144,10 @@ const CreateExercise = () => {
                     </button>
 
                     <div className="card shadow">
-                        <div className="card-header bg-success text-white">
+                        <div className="card-header bg-warning text-white">
                             <h2 className="mb-0">
-                                <i className="fas fa-tasks me-2"></i>
-                                Create New Exercise
+                                <i className="fas fa-edit me-2"></i>
+                                Edit Exercise
                             </h2>
                         </div>
                         <div className="card-body p-4">
@@ -105,7 +158,6 @@ const CreateExercise = () => {
                                         type="text" 
                                         name="title" 
                                         className={`form-control ${validationErrors.title ? 'is-invalid' : ''}`}
-                                        placeholder="Enter exercise title"
                                         value={formData.title}
                                         onChange={handleChange}
                                         required 
@@ -121,7 +173,6 @@ const CreateExercise = () => {
                                         name="description" 
                                         className={`form-control ${validationErrors.description ? 'is-invalid' : ''}`}
                                         rows="3"
-                                        placeholder="Enter exercise description"
                                         value={formData.description}
                                         onChange={handleChange}
                                         required 
@@ -137,7 +188,6 @@ const CreateExercise = () => {
                                         name="content" 
                                         className={`form-control ${validationErrors.content ? 'is-invalid' : ''}`}
                                         rows="4"
-                                        placeholder="Enter the exercise question or problem"
                                         value={formData.content}
                                         onChange={handleChange}
                                         required 
@@ -153,7 +203,6 @@ const CreateExercise = () => {
                                         name="solution" 
                                         className={`form-control ${validationErrors.solution ? 'is-invalid' : ''}`}
                                         rows="4"
-                                        placeholder="Enter the solution or answer"
                                         value={formData.solution}
                                         onChange={handleChange}
                                         required 
@@ -183,7 +232,6 @@ const CreateExercise = () => {
                                         type="number" 
                                         name="points" 
                                         className={`form-control ${validationErrors.points ? 'is-invalid' : ''}`}
-                                        placeholder="Enter points for this exercise"
                                         value={formData.points}
                                         onChange={handleChange}
                                         min="1"
@@ -217,18 +265,18 @@ const CreateExercise = () => {
                                 <div className="d-grid gap-2">
                                     <button 
                                         type="submit" 
-                                        className="btn btn-success"
+                                        className="btn btn-warning"
                                         disabled={loading}
                                     >
                                         {loading ? (
                                             <>
-                                                <span className="spinner-border spinner-border-sm me-2" role="status"></span>
-                                                Creating...
+                                                <span className="spinner-border spinner-border-sm me-2"></span>
+                                                Updating...
                                             </>
                                         ) : (
                                             <>
-                                                <i className="fas fa-plus me-2"></i>
-                                                Create Exercise
+                                                <i className="fas fa-save me-2"></i>
+                                                Update Exercise
                                             </>
                                         )}
                                     </button>
@@ -249,4 +297,4 @@ const CreateExercise = () => {
     );
 }
 
-export default CreateExercise;
+export default EditExercise;

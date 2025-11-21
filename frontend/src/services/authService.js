@@ -1,4 +1,3 @@
-
 import API from './api';
 
 export const register = async (userData) => {
@@ -56,4 +55,40 @@ export const isAuthenticated = () => {
 export const getCurrentUser = () => {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
+};
+
+export const getAllUsers = async () => {
+    try {
+        const response = await API.get('/admin/users');
+        return response.data;
+    } catch (error) {
+        throw error.response?.data || { message: 'Network error' };
+    }
+};
+
+export const createTeacher = async (teacherData) => {
+    try {
+        const response = await API.post('/admin/teachers', teacherData);
+        return response.data;
+    } catch (error) {
+        throw error.response?.data || { message: 'Network error' };
+    }
+};
+
+export const updateUser = async (id, userData) => {
+    try {
+        const response = await API.put(`/admin/users/${id}`, userData);
+        return response.data;
+    } catch (error) {
+        throw error.response?.data || { message: 'Network error' };
+    }
+};
+
+export const deleteUser = async (id) => {
+    try {
+        const response = await API.delete(`/admin/users/${id}`);
+        return response.data;
+    } catch (error) {
+        throw error.response?.data || { message: 'Network error' };
+    }
 };

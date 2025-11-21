@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.css';
+import '@fortawesome/fontawesome-free/css/all.min.css';
 import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
@@ -11,17 +11,23 @@ import LessonDetail from './components/LessonDetail';
 import ExerciseDetail from './components/ExerciseDetail';
 import CreateLesson from './components/CreateLesson';
 import CreateExercise from './components/CreateExercise';
-import { isAuthenticated } from './services/authService';
+import EditLesson from './components/EditLesson';
+import EditExercise from './components/EditExercise';
+import AdminDashboard from './components/AdminDashboard';
+import { isAuthenticated, getCurrentUser } from './services/authService';
 
 function App() {
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuth, setIsAuth] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
-    // التحقق من حالة المصادقة عند تحميل التطبيق
     const checkAuth = () => {
       const authenticated = isAuthenticated();
       setIsAuth(authenticated);
+      if (authenticated) {
+        setCurrentUser(getCurrentUser());
+      }
       setAuthChecked(true);
     };
 
@@ -55,12 +61,20 @@ function App() {
             element={isAuth ? <Dashboard /> : <Navigate to="/login" replace />} 
           />
           <Route 
+            path="/admin/dashboard" 
+            element={isAuth && currentUser?.role === 'admin' ? <AdminDashboard /> : <Navigate to="/dashboard" replace />} 
+          />
+          <Route 
             path="/lessons" 
             element={isAuth ? <Lessons /> : <Navigate to="/login" replace />} 
           />
           <Route 
             path="/lessons/create" 
             element={isAuth ? <CreateLesson /> : <Navigate to="/login" replace />} 
+          />
+          <Route 
+            path="/lessons/edit/:id" 
+            element={isAuth ? <EditLesson /> : <Navigate to="/login" replace />} 
           />
           <Route 
             path="/lessons/:id" 
@@ -73,6 +87,10 @@ function App() {
           <Route 
             path="/exercises/create" 
             element={isAuth ? <CreateExercise /> : <Navigate to="/login" replace />} 
+          />
+          <Route 
+            path="/exercises/edit/:id" 
+            element={isAuth ? <EditExercise /> : <Navigate to="/login" replace />} 
           />
           <Route 
             path="/exercises/:id" 

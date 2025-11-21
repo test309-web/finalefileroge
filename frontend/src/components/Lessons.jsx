@@ -1,109 +1,157 @@
-
 import React, { useState, useEffect } from 'react';
-import { getLessons, searchLessons } from '../services/lessonService';
+import { Link, useNavigate } from 'react-router-dom';
+import { getLessons, deleteLesson, getTeacherLessons } from '../services/lessonService';
+import { getCurrentUser } from '../services/authService';
 
 const Lessons = () => {
     const [lessons, setLessons] = useState([]);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [currentUser, setCurrentUser] = useState(null);
+    const navigate = useNavigate();
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const userData = JSON.parse(localStorage.getItem('user'));
-                setUser(userData);
-
-                const lessonsData = await getLessons();
-                setLessons(lessonsData.lessons || []);
-            } catch (error) {
-                console.error("Failed to fetch lessons", error);
-            }
-        };
-        fetchData();
+        const user = getCurrentUser();
+        setCurrentUser(user);
+        loadLessons(user);
     }, []);
 
-    const handleSearch = async (e) => {
-        e.preventDefault();
+    const handleBack = () => {
+        navigate(-1);
+    };
+
+    const loadLessons = async (user) => {
         try {
-            const searchData = {};
-            if (searchTerm) {
-                searchData.title = searchTerm;
+            let lessonsData;
+            if (user?.role === 'teacher') {
+                lessonsData = await getTeacherLessons();
+            } else {
+                lessonsData = await getLessons();
             }
-            const result = await searchLessons(searchData);
-            setLessons(result.lessons || []);
+            setLessons(lessonsData.data || []);
         } catch (error) {
-            console.error("Search failed", error);
+            console.error('Error loading lessons:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
+    const handleDeleteLesson = async (lessonId) => {
+        if (window.confirm('Are you sure you want to delete this lesson?')) {
+            try {
+                await deleteLesson(lessonId);
+                loadLessons(currentUser);
+            } catch (error) {
+                alert('Error deleting lesson');
+            }
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="container mt-4">
+                <div className="text-center">
+                    <div className="spinner-border" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="container mt-4">
-            <nav className="navbar navbar-light bg-light mb-4">
-                <div className="container-fluid">
-                    <a className="navbar-brand" href="/dashboard">← Back to Dashboard</a>
-                    <form className="d-flex" onSubmit={handleSearch}>
-                        <input 
-                            className="form-control me-2" 
-                            type="search" 
-                            placeholder="Search lessons..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                        <button className="btn btn-outline-success" type="submit">Search</button>
-                    </form>
-                </div>
-            </nav>
-
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <h1>All Lessons</h1>
-                {user && user.role === 'teacher' && (
-                    <a href="/lessons/create" className="btn btn-primary">Create New Lesson</a>
-                )}
-            </div>
-
             <div className="row">
-                {lessons.map(lesson => (
-                    <div key={lesson.id} className="col-md-6 mb-4">
-                        <div className="card h-100">
-                            <div className="card-body">
-                                <h5 className="card-title">{lesson.title}</h5>
-                                <p className="card-text">{lesson.description}</p>
-                                <div className="mb-2">
-                                    <small className="text-muted">
-                                        Subject: {lesson.subject} | Level: {lesson.level}
-                                    </small>
-                                </div>
-                                <div className="mb-2">
-                                    <small className="text-muted">
-                                        Teacher: {lesson.teacher ? lesson.teacher.name : 'Unknown'}
-                                    </small>
-                                </div>
-                                {lesson.exercises && lesson.exercises.length > 0 && (
-                                    <div className="mb-2">
-                                        <small className="text-muted">
-                                            Exercises: {lesson.exercises.length}
-                                        </small>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="card-footer">
-                                <a href={`/lessons/${lesson.id}`} className="btn btn-outline-primary btn-sm">
-                                    View Details
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+                <div className="col-12">
+                    <button 
+                        className="btn btn-outline-secondary mb-3"
+                        onClick={handleBack}
+                    >
+                        <i className="fas fa-arrow-left me-2"></i>
+                        Back
+                    </button>
 
-            {lessons.length === 0 && (
-                <div className="text-center mt-5">
-                    <h3>No lessons found</h3>
-                    <p>Try adjusting your search terms or create a new lesson.</p>
+                    <div className="d-flex justify-content-between align-items-center mb-4">
+                        <h1>
+                            <i className="fas fa-book me-2"></i>
+                            Lessons
+                        </h1>
+                        {(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && (
+                            <Link to="/lessons/create" className="btn btn-primary">
+                                <i className="fas fa-plus me-2"></i>
+                                Create Lesson
+                            </Link>
+                        )}
+                    </div>
+
+                    <div className="row">
+                        {lessons.map(lesson => (
+                            <div key={lesson.id} className="col-md-6 col-lg-4 mb-4">
+                                <div className="card h-100 shadow-sm">
+                                    <div className="card-body">
+                                        <h5 className="card-title">{lesson.title}</h5>
+                                        <p className="card-text text-muted">{lesson.description}</p>
+                                        <div className="mb-2">
+                                            <span className={`badge ${
+                                                lesson.level === 'beginner' ? 'bg-success' : 
+                                                lesson.level === 'intermediate' ? 'bg-warning' : 'bg-danger'
+                                            }`}>
+                                                {lesson.level}
+                                            </span>
+                                        </div>
+                                        <p className="card-text">
+                                            <small className="text-muted">
+                                                By: {lesson.teacher?.name || 'Unknown'}
+                                            </small>
+                                        </p>
+                                    </div>
+                                    <div className="card-footer bg-transparent">
+                                        <div className="d-flex justify-content-between">
+                                            <Link 
+                                                to={`/lessons/${lesson.id}`} 
+                                                className="btn btn-outline-primary btn-sm"
+                                            >
+                                                View
+                                            </Link>
+                                            {(currentUser?.role === 'admin' || 
+                                              (currentUser?.role === 'teacher' && lesson.teacher_id === currentUser.id)) && (
+                                                <div>
+                                                    <Link 
+                                                        to={`/lessons/edit/${lesson.id}`}
+                                                        className="btn btn-outline-warning btn-sm me-2"
+                                                    >
+                                                        <i className="fas fa-edit"></i>
+                                                    </Link>
+                                                    <button 
+                                                        className="btn btn-outline-danger btn-sm"
+                                                        onClick={() => handleDeleteLesson(lesson.id)}
+                                                    >
+                                                        <i className="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {lessons.length === 0 && (
+                        <div className="text-center py-5">
+                            <i className="fas fa-book fa-3x text-muted mb-3"></i>
+                            <h4>No lessons available</h4>
+                            <p className="text-muted">Start by creating your first lesson.</p>
+                            {(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && (
+                                <Link to="/lessons/create" className="btn btn-primary">
+                                    Create First Lesson
+                                </Link>
+                            )}
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
         </div>
     );
-};
+}
 
 export default Lessons;

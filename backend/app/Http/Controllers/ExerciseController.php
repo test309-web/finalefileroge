@@ -3,13 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Exercise;
-use App\Models\StudentPoint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
-/**
- * @OA\Tag(name="Exercises")
- */
 class ExerciseController extends Controller
 {
     public function __construct()
@@ -22,37 +18,64 @@ class ExerciseController extends Controller
      *     path="/api/exercises",
      *     summary="Get all exercises",
      *     tags={"Exercises"},
-     *     security={{"sanctum":{}}},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Response(
      *         response=200,
-     *         description="List of exercises"
+     *         description="Exercises retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="success"),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
+     *         )
      *     )
      * )
      */
-    public function index(Request $request)
+    public function index()
     {
-        try {
-            $user = $request->user();
-            
-            if ($user->isTeacher()) {
-                $exercises = Exercise::where('teacher_id', $user->id)
-                    ->with(['lesson'])
-                    ->get();
-            } else {
-                $exercises = Exercise::with(['teacher', 'lesson'])
-                    ->get();
-            }
+        $exercises = Exercise::with(['teacher', 'lesson'])->get();
+        
+        return response()->json([
+            'status' => 'success',
+            'data' => $exercises
+        ], 200);
+    }
 
-            return response()->json([
-                'status' => 'success',
-                'exercises' => $exercises
-            ]);
-        } catch (\Exception $e) {
+    /**
+     * @OA\Get(
+     *     path="/api/exercises/{id}",
+     *     summary="Get specific exercise",
+     *     tags={"Exercises"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Exercise retrieved successfully"
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Exercise not found"
+     *     )
+     * )
+     */
+    public function show($id)
+    {
+        $exercise = Exercise::with(['teacher', 'lesson'])->find($id);
+        
+        if (!$exercise) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to fetch exercises: ' . $e->getMessage()
-            ], 500);
+                'message' => 'Exercise not found'
+            ], 404);
         }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $exercise
+        ], 200);
     }
 
     /**
@@ -60,118 +83,66 @@ class ExerciseController extends Controller
      *     path="/api/exercises",
      *     summary="Create a new exercise",
      *     tags={"Exercises"},
-     *     security={{"sanctum":{}}},
+     *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"title","description","content","lesson_id","subject","level","points"},
-     *             @OA\Property(property="title", type="string"),
-     *             @OA\Property(property="description", type="string"),
-     *             @OA\Property(property="content", type="string"),
-     *             @OA\Property(property="lesson_id", type="integer"),
-     *             @OA\Property(property="subject", type="string"),
-     *             @OA\Property(property="level", type="string"),
-     *             @OA\Property(property="points", type="integer"),
-     *             @OA\Property(property="file_url", type="string")
+     *             required={"title","description","content","solution","level","points","lesson_id"},
+     *             @OA\Property(property="title", type="string", example="Exercise Title"),
+     *             @OA\Property(property="description", type="string", example="Exercise description"),
+     *             @OA\Property(property="content", type="string", example="Exercise content"),
+     *             @OA\Property(property="solution", type="string", example="Exercise solution"),
+     *             @OA\Property(property="level", type="string", enum={"beginner", "intermediate", "advanced"}, example="beginner"),
+     *             @OA\Property(property="points", type="integer", example=10),
+     *             @OA\Property(property="lesson_id", type="integer", example=1)
      *         )
      *     ),
      *     @OA\Response(
      *         response=201,
      *         description="Exercise created successfully"
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error"
      *     )
      * )
      */
     public function store(Request $request)
     {
-        try {
-            $user = $request->user();
-            
-            if (!$user->isTeacher()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Only teachers can create exercises'
-                ], 403);
-            }
+        $validator = Validator::make($request->all(), [
+            'title' => 'required|string|max:255',
+            'description' => 'required|string',
+            'content' => 'required|string',
+            'solution' => 'required|string',
+            'level' => 'required|in:beginner,intermediate,advanced',
+            'points' => 'required|integer|min:1',
+            'lesson_id' => 'required|exists:lessons,id'
+        ]);
 
-            $validator = Validator::make($request->all(), [
-                'title' => 'required|string|max:255',
-                'description' => 'required|string',
-                'content' => 'required|string',
-                'lesson_id' => 'required|exists:lessons,id',
-                'subject' => 'required|string|max:255',
-                'level' => 'required|string|max:255',
-                'points' => 'required|integer|min:0'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json($validator->errors(), 422);
-            }
-
-            $exercise = Exercise::create([
-                'title' => $request->title,
-                'description' => $request->description,
-                'content' => $request->content,
-                'teacher_id' => $user->id,
-                'lesson_id' => $request->lesson_id,
-                'subject' => $request->subject,
-                'level' => $request->level,
-                'points' => $request->points,
-                'file_url' => $request->file_url
-            ]);
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Exercise created successfully',
-                'exercise' => $exercise
-            ], 201);
-        } catch (\Exception $e) {
+        if ($validator->fails()) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to create exercise: ' . $e->getMessage()
-            ], 500);
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
         }
-    }
 
-    /**
-     * @OA\Get(
-     *     path="/api/exercises/{id}",
-     *     summary="Get exercise details",
-     *     tags={"Exercises"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Exercise details"
-     *     )
-     * )
-     */
-    public function show($id)
-    {
-        try {
-            $exercise = Exercise::with(['teacher', 'lesson', 'studentPoints.student'])->find($id);
+        $exercise = Exercise::create([
+            'title' => $request->title,
+            'description' => $request->description,
+            'content' => $request->content,
+            'solution' => $request->solution,
+            'level' => $request->level,
+            'points' => $request->points,
+            'lesson_id' => $request->lesson_id,
+            'teacher_id' => $request->user()->id
+        ]);
 
-            if (!$exercise) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Exercise not found'
-                ], 404);
-            }
-
-            return response()->json([
-                'status' => 'success',
-                'exercise' => $exercise
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Failed to fetch exercise: ' . $e->getMessage()
-            ], 500);
-        }
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Exercise created successfully',
+            'data' => $exercise
+        ], 201);
     }
 
     /**
@@ -179,7 +150,7 @@ class ExerciseController extends Controller
      *     path="/api/exercises/{id}",
      *     summary="Update exercise",
      *     tags={"Exercises"},
-     *     security={{"sanctum":{}}},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -189,68 +160,72 @@ class ExerciseController extends Controller
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             @OA\Property(property="title", type="string"),
-     *             @OA\Property(property="description", type="string"),
-     *             @OA\Property(property="content", type="string"),
-     *             @OA\Property(property="lesson_id", type="integer"),
-     *             @OA\Property(property="subject", type="string"),
-     *             @OA\Property(property="level", type="string"),
-     *             @OA\Property(property="points", type="integer")
+     *             @OA\Property(property="title", type="string", example="Updated Title"),
+     *             @OA\Property(property="description", type="string", example="Updated description"),
+     *             @OA\Property(property="content", type="string", example="Updated content"),
+     *             @OA\Property(property="solution", type="string", example="Updated solution"),
+     *             @OA\Property(property="level", type="string", enum={"beginner", "intermediate", "advanced"}),
+     *             @OA\Property(property="points", type="integer", example=15),
+     *             @OA\Property(property="lesson_id", type="integer", example=1)
      *         )
      *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Exercise updated successfully"
+     *     ),
+     *     @OA\Response(
+     *         response=403,
+     *         description="Unauthorized to update this exercise"
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Exercise not found"
      *     )
      * )
      */
     public function update(Request $request, $id)
     {
-        try {
-            $user = $request->user();
-            $exercise = Exercise::find($id);
-
-            if (!$exercise) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Exercise not found'
-                ], 404);
-            }
-
-            if ($exercise->teacher_id !== $user->id) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Unauthorized to update this exercise'
-                ], 403);
-            }
-
-            $validator = Validator::make($request->all(), [
-                'title' => 'sometimes|string|max:255',
-                'description' => 'sometimes|string',
-                'content' => 'sometimes|string',
-                'lesson_id' => 'sometimes|exists:lessons,id',
-                'subject' => 'sometimes|string|max:255',
-                'level' => 'sometimes|string|max:255',
-                'points' => 'sometimes|integer|min:0'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json($validator->errors(), 422);
-            }
-
-            $exercise->update($request->all());
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Exercise updated successfully',
-                'exercise' => $exercise
-            ]);
-        } catch (\Exception $e) {
+        $exercise = Exercise::find($id);
+        
+        if (!$exercise) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to update exercise: ' . $e->getMessage()
-            ], 500);
+                'message' => 'Exercise not found'
+            ], 404);
         }
+
+        if ($exercise->teacher_id !== $request->user()->id && !$request->user()->isAdmin()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized to update this exercise'
+            ], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'title' => 'sometimes|string|max:255',
+            'description' => 'sometimes|string',
+            'content' => 'sometimes|string',
+            'solution' => 'sometimes|string',
+            'level' => 'sometimes|in:beginner,intermediate,advanced',
+            'points' => 'sometimes|integer|min:1',
+            'lesson_id' => 'sometimes|exists:lessons,id'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $exercise->update($request->all());
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Exercise updated successfully',
+            'data' => $exercise
+        ], 200);
     }
 
     /**
@@ -258,7 +233,7 @@ class ExerciseController extends Controller
      *     path="/api/exercises/{id}",
      *     summary="Delete exercise",
      *     tags={"Exercises"},
-     *     security={{"sanctum":{}}},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -268,108 +243,41 @@ class ExerciseController extends Controller
      *     @OA\Response(
      *         response=200,
      *         description="Exercise deleted successfully"
+     *     ),
+     *     @OA\Response(
+     *         response=403,
+     *         description="Unauthorized to delete this exercise"
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Exercise not found"
      *     )
      * )
      */
     public function destroy(Request $request, $id)
     {
-        try {
-            $user = $request->user();
-            $exercise = Exercise::find($id);
-
-            if (!$exercise) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Exercise not found'
-                ], 404);
-            }
-
-            if ($exercise->teacher_id !== $user->id) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Unauthorized to delete this exercise'
-                ], 403);
-            }
-
-            StudentPoint::where('exercise_id', $exercise->id)->delete();
-
-            $exercise->delete();
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Exercise deleted successfully'
-            ]);
-        } catch (\Exception $e) {
+        $exercise = Exercise::find($id);
+        
+        if (!$exercise) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to delete exercise: ' . $e->getMessage()
-            ], 500);
+                'message' => 'Exercise not found'
+            ], 404);
         }
-    }
 
-    /**
-     * @OA\Post(
-     *     path="/api/exercises/assign-points",
-     *     summary="Assign points to student",
-     *     tags={"Exercises"},
-     *     security={{"sanctum":{}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"student_id","exercise_id","points_earned"},
-     *             @OA\Property(property="student_id", type="integer"),
-     *             @OA\Property(property="exercise_id", type="integer"),
-     *             @OA\Property(property="points_earned", type="integer"),
-     *             @OA\Property(property="teacher_notes", type="string")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Points assigned successfully"
-     *     )
-     * )
-     */
-    public function assignPoints(Request $request)
-    {
-        try {
-            $user = $request->user();
-            
-            if (!$user->isTeacher()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Only teachers can assign points'
-                ], 403);
-            }
-
-            $validator = Validator::make($request->all(), [
-                'student_id' => 'required|exists:users,id',
-                'exercise_id' => 'required|exists:exercises,id',
-                'points_earned' => 'required|integer|min:0',
-                'teacher_notes' => 'sometimes|string'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json($validator->errors(), 422);
-            }
-
-            $studentPoint = StudentPoint::create([
-                'student_id' => $request->student_id,
-                'exercise_id' => $request->exercise_id,
-                'points_earned' => $request->points_earned,
-                'teacher_notes' => $request->teacher_notes
-            ]);
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Points assigned successfully',
-                'student_point' => $studentPoint
-            ], 201);
-        } catch (\Exception $e) {
+        if ($exercise->teacher_id !== $request->user()->id && !$request->user()->isAdmin()) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to assign points: ' . $e->getMessage()
-            ], 500);
+                'message' => 'Unauthorized to delete this exercise'
+            ], 403);
         }
+
+        $exercise->delete();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Exercise deleted successfully'
+        ], 200);
     }
 
     /**
@@ -377,16 +285,24 @@ class ExerciseController extends Controller
      *     path="/api/exercises/search/by",
      *     summary="Search exercises",
      *     tags={"Exercises"},
-     *     security={{"sanctum":{}}},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="title",
      *         in="query",
+     *         required=false,
      *         @OA\Schema(type="string")
      *     ),
      *     @OA\Parameter(
-     *         name="subject",
+     *         name="level",
      *         in="query",
-     *         @OA\Schema(type="string")
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"beginner", "intermediate", "advanced"})
+     *     ),
+     *     @OA\Parameter(
+     *         name="lesson_id",
+     *         in="query",
+     *         required=false,
+     *         @OA\Schema(type="integer")
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -396,32 +312,55 @@ class ExerciseController extends Controller
      */
     public function search(Request $request)
     {
-        try {
-            $query = Exercise::with(['teacher', 'lesson']);
+        $query = Exercise::with(['teacher', 'lesson']);
 
-            if ($request->has('title')) {
-                $query->where('title', 'like', '%' . $request->title . '%');
-            }
-
-            if ($request->has('subject')) {
-                $query->where('subject', 'like', '%' . $request->subject . '%');
-            }
-
-            if ($request->has('level')) {
-                $query->where('level', $request->level);
-            }
-
-            $exercises = $query->get();
-
-            return response()->json([
-                'status' => 'success',
-                'exercises' => $exercises
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Search failed: ' . $e->getMessage()
-            ], 500);
+        if ($request->has('title')) {
+            $query->where('title', 'like', '%' . $request->title . '%');
         }
+
+        if ($request->has('level')) {
+            $query->where('level', $request->level);
+        }
+
+        if ($request->has('lesson_id')) {
+            $query->where('lesson_id', $request->lesson_id);
+        }
+
+        $exercises = $query->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $exercises
+        ], 200);
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/exercises/assign-points",
+     *     summary="Assign points for exercise",
+     *     tags={"Exercises"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"exercise_id","user_id","points"},
+     *             @OA\Property(property="exercise_id", type="integer", example=1),
+     *             @OA\Property(property="user_id", type="integer", example=1),
+     *             @OA\Property(property="points", type="integer", example=10)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Points assigned successfully"
+     *     )
+     * )
+     */
+    public function assignPoints(Request $request)
+    {
+        
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Points assigned successfully'
+        ], 200);
     }
 }

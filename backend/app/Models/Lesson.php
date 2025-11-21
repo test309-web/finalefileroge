@@ -13,10 +13,8 @@ class Lesson extends Model
         'title',
         'description',
         'content',
-        'teacher_id',
-        'subject',
         'level',
-        'file_path'
+        'teacher_id'
     ];
 
     public function teacher()

@@ -3,14 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Lesson;
-use App\Models\Exercise;
-use App\Models\StudentPoint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
-/**
- * @OA\Tag(name="Lessons")
- */
 class LessonController extends Controller
 {
     public function __construct()
@@ -26,32 +21,98 @@ class LessonController extends Controller
      *     security={{"sanctum":{}}},
      *     @OA\Response(
      *         response=200,
-     *         description="List of lessons"
+     *         description="Successful operation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="success"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(ref="#/components/schemas/Lesson")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="error"),
+     *             @OA\Property(property="message", type="string", example="Server error message")
+     *         )
      *     )
      * )
      */
-    public function index(Request $request)
+    public function index()
     {
         try {
-            $user = $request->user();
+            $lessons = Lesson::with('teacher')->get();
             
-            if ($user->isTeacher()) {
-                $lessons = Lesson::where('teacher_id', $user->id)
-                    ->with(['exercises'])
-                    ->get();
-            } else {
-                $lessons = Lesson::with(['teacher', 'exercises'])
-                    ->get();
+            return response()->json([
+                'status' => 'success',
+                'data' => $lessons
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Server error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/lessons/{id}",
+     *     summary="Get specific lesson by ID",
+     *     tags={"Lessons"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="Lesson ID",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Successful operation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="success"),
+     *             @OA\Property(property="data", ref="#/components/schemas/LessonWithExercises")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Lesson not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="error"),
+     *             @OA\Property(property="message", type="string", example="Lesson not found")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error"
+     *     )
+     * )
+     */
+    public function show($id)
+    {
+        try {
+            $lesson = Lesson::with(['teacher', 'exercises'])->find($id);
+            
+            if (!$lesson) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Lesson not found'
+                ], 404);
             }
 
             return response()->json([
                 'status' => 'success',
-                'lessons' => $lessons
-            ]);
+                'data' => $lesson
+            ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to fetch lessons: ' . $e->getMessage()
+                'message' => 'Server error: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -65,106 +126,72 @@ class LessonController extends Controller
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"title","description","content","subject","level"},
-     *             @OA\Property(property="title", type="string"),
-     *             @OA\Property(property="description", type="string"),
-     *             @OA\Property(property="content", type="string"),
-     *             @OA\Property(property="subject", type="string"),
-     *             @OA\Property(property="level", type="string"),
-     *             @OA\Property(property="file_url", type="string")
+     *             required={"title","description","content","level"},
+     *             @OA\Property(property="title", type="string", maxLength=255, example="Introduction to PHP"),
+     *             @OA\Property(property="description", type="string", example="A beginner-friendly introduction to PHP programming"),
+     *             @OA\Property(property="content", type="string", example="Full lesson content here..."),
+     *             @OA\Property(property="level", type="string", enum={"beginner","intermediate","advanced"}, example="beginner")
      *         )
      *     ),
      *     @OA\Response(
      *         response=201,
-     *         description="Lesson created successfully"
+     *         description="Lesson created successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="success"),
+     *             @OA\Property(property="message", type="string", example="Lesson created successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/Lesson")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="error"),
+     *             @OA\Property(property="message", type="string", example="Validation failed"),
+     *             @OA\Property(property="errors", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error"
      *     )
      * )
      */
     public function store(Request $request)
     {
         try {
-            $user = $request->user();
-            
-            if (!$user->isTeacher()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Only teachers can create lessons'
-                ], 403);
-            }
-
             $validator = Validator::make($request->all(), [
                 'title' => 'required|string|max:255',
                 'description' => 'required|string',
                 'content' => 'required|string',
-                'subject' => 'required|string|max:255',
-                'level' => 'required|string|max:255'
+                'level' => 'required|in:beginner,intermediate,advanced'
             ]);
 
             if ($validator->fails()) {
-                return response()->json($validator->errors(), 422);
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
             }
 
             $lesson = Lesson::create([
                 'title' => $request->title,
                 'description' => $request->description,
                 'content' => $request->content,
-                'teacher_id' => $user->id,
-                'subject' => $request->subject,
                 'level' => $request->level,
-                'file_url' => $request->file_url
+                'teacher_id' => $request->user()->id
             ]);
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Lesson created successfully',
-                'lesson' => $lesson
+                'data' => $lesson
             ], 201);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to create lesson: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * @OA\Get(
-     *     path="/api/lessons/{id}",
-     *     summary="Get lesson details",
-     *     tags={"Lessons"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Lesson details"
-     *     )
-     * )
-     */
-    public function show($id)
-    {
-        try {
-            $lesson = Lesson::with(['teacher', 'exercises'])->find($id);
-
-            if (!$lesson) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Lesson not found'
-                ], 404);
-            }
-
-            return response()->json([
-                'status' => 'success',
-                'lesson' => $lesson
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Failed to fetch lesson: ' . $e->getMessage()
+                'message' => 'Server error: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -172,38 +199,61 @@ class LessonController extends Controller
     /**
      * @OA\Put(
      *     path="/api/lessons/{id}",
-     *     summary="Update lesson",
+     *     summary="Update an existing lesson",
      *     tags={"Lessons"},
      *     security={{"sanctum":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *         description="Lesson ID",
      *         @OA\Schema(type="integer")
      *     ),
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             @OA\Property(property="title", type="string"),
-     *             @OA\Property(property="description", type="string"),
-     *             @OA\Property(property="content", type="string"),
-     *             @OA\Property(property="subject", type="string"),
-     *             @OA\Property(property="level", type="string"),
-     *             @OA\Property(property="file_url", type="string")
+     *             @OA\Property(property="title", type="string", maxLength=255, example="Updated Lesson Title"),
+     *             @OA\Property(property="description", type="string", example="Updated description"),
+     *             @OA\Property(property="content", type="string", example="Updated content..."),
+     *             @OA\Property(property="level", type="string", enum={"beginner","intermediate","advanced"}, example="intermediate")
      *         )
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Lesson updated successfully"
+     *         description="Lesson updated successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="success"),
+     *             @OA\Property(property="message", type="string", example="Lesson updated successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/Lesson")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=403,
+     *         description="Unauthorized to update this lesson",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="error"),
+     *             @OA\Property(property="message", type="string", example="Unauthorized to update this lesson")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Lesson not found"
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error"
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error"
      *     )
      * )
      */
     public function update(Request $request, $id)
     {
         try {
-            $user = $request->user();
             $lesson = Lesson::find($id);
-
+            
             if (!$lesson) {
                 return response()->json([
                     'status' => 'error',
@@ -211,7 +261,7 @@ class LessonController extends Controller
                 ], 404);
             }
 
-            if ($lesson->teacher_id !== $user->id) {
+            if ($lesson->teacher_id !== $request->user()->id && !$request->user()->isAdmin()) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Unauthorized to update this lesson'
@@ -222,13 +272,15 @@ class LessonController extends Controller
                 'title' => 'sometimes|string|max:255',
                 'description' => 'sometimes|string',
                 'content' => 'sometimes|string',
-                'subject' => 'sometimes|string|max:255',
-                'level' => 'sometimes|string|max:255',
-                'file_url' => 'sometimes|string'
+                'level' => 'sometimes|in:beginner,intermediate,advanced'
             ]);
 
             if ($validator->fails()) {
-                return response()->json($validator->errors(), 422);
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
             }
 
             $lesson->update($request->all());
@@ -236,12 +288,12 @@ class LessonController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Lesson updated successfully',
-                'lesson' => $lesson
-            ]);
+                'data' => $lesson
+            ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to update lesson: ' . $e->getMessage()
+                'message' => 'Server error: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -249,27 +301,43 @@ class LessonController extends Controller
     /**
      * @OA\Delete(
      *     path="/api/lessons/{id}",
-     *     summary="Delete lesson",
+     *     summary="Delete a lesson",
      *     tags={"Lessons"},
      *     security={{"sanctum":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *         description="Lesson ID",
      *         @OA\Schema(type="integer")
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Lesson deleted successfully"
+     *         description="Lesson deleted successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="success"),
+     *             @OA\Property(property="message", type="string", example="Lesson deleted successfully")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=403,
+     *         description="Unauthorized to delete this lesson"
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Lesson not found"
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error"
      *     )
      * )
      */
     public function destroy(Request $request, $id)
     {
         try {
-            $user = $request->user();
             $lesson = Lesson::find($id);
-
+            
             if (!$lesson) {
                 return response()->json([
                     'status' => 'error',
@@ -277,7 +345,7 @@ class LessonController extends Controller
                 ], 404);
             }
 
-            if ($lesson->teacher_id !== $user->id) {
+            if ($lesson->teacher_id !== $request->user()->id && !$request->user()->isAdmin()) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Unauthorized to delete this lesson'
@@ -289,48 +357,99 @@ class LessonController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Lesson deleted successfully'
-            ]);
+            ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to delete lesson: ' . $e->getMessage()
+                'message' => 'Server error: ' . $e->getMessage()
             ], 500);
         }
     }
 
     /**
      * @OA\Get(
-     *     path="/api/lessons/search/by",
-     *     summary="Search lessons",
+     *     path="/api/teacher/lessons",
+     *     summary="Get lessons created by the authenticated teacher",
+     *     tags={"Lessons"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Successful operation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="success"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(ref="#/components/schemas/Lesson")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error"
+     *     )
+     * )
+     */
+    public function teacherLessons(Request $request)
+    {
+        try {
+            $lessons = Lesson::where('teacher_id', $request->user()->id)->get();
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $lessons
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Server error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/lessons/search",
+     *     summary="Search lessons by title and/or level",
      *     tags={"Lessons"},
      *     security={{"sanctum":{}}},
      *     @OA\Parameter(
      *         name="title",
      *         in="query",
+     *         description="Search by lesson title",
      *         @OA\Schema(type="string")
      *     ),
      *     @OA\Parameter(
-     *         name="subject",
+     *         name="level",
      *         in="query",
-     *         @OA\Schema(type="string")
+     *         description="Filter by level",
+     *         @OA\Schema(type="string", enum={"beginner","intermediate","advanced"})
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Search results"
+     *         description="Successful operation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="success"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(ref="#/components/schemas/Lesson")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error"
      *     )
      * )
      */
     public function search(Request $request)
     {
         try {
-            $query = Lesson::with(['teacher', 'exercises']);
+            $query = Lesson::with('teacher');
 
             if ($request->has('title')) {
                 $query->where('title', 'like', '%' . $request->title . '%');
-            }
-
-            if ($request->has('subject')) {
-                $query->where('subject', 'like', '%' . $request->subject . '%');
             }
 
             if ($request->has('level')) {
@@ -341,12 +460,12 @@ class LessonController extends Controller
 
             return response()->json([
                 'status' => 'success',
-                'lessons' => $lessons
-            ]);
+                'data' => $lessons
+            ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Search failed: ' . $e->getMessage()
+                'message' => 'Server error: ' . $e->getMessage()
             ], 500);
         }
     }
