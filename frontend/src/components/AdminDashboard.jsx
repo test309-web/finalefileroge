@@ -4,88 +4,97 @@ import { getCurrentUser } from '../services/authService';
 import { useNavigate } from 'react-router-dom';
 
 const AdminDashboard = () => {
-    const [users, setUsers] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [showTeacherForm, setShowTeacherForm] = useState(false);
-    const [currentUser, setCurrentUser] = useState(null);
+    // États pour gérer les données et l'interface
+    const [users, setUsers] = useState([]); // Liste des utilisateurs
+    const [loading, setLoading] = useState(false); // État de chargement
+    const [showTeacherForm, setShowTeacherForm] = useState(false); // Affichage du formulaire enseignant
+    const [currentUser, setCurrentUser] = useState(null); // Utilisateur connecté
     const [teacherForm, setTeacherForm] = useState({
         name: '',
         email: '',
         password: '',
         password_confirmation: ''
-    });
+    }); // Données du formulaire enseignant
     const navigate = useNavigate();
 
+    // Effet pour charger l'utilisateur et les données au montage du composant
     useEffect(() => {
-        const user = getCurrentUser();
+        const user = getCurrentUser(); // Récupérer l'utilisateur connecté
         setCurrentUser(user);
         if (user?.role === 'admin') {
-            loadUsers();
+            loadUsers(); // Charger les utilisateurs si admin
         }
     }, []);
 
+    // Fonction pour charger la liste des utilisateurs
     const loadUsers = async () => {
         try {
             setLoading(true);
-            const usersData = await getAllUsers();
+            const usersData = await getAllUsers(); // Appel API pour récupérer les utilisateurs
             setUsers(usersData.data || []);
         } catch (error) {
-            alert('Error loading users');
+            alert('Error loading users'); // Gestion des erreurs
         } finally {
             setLoading(false);
         }
     };
 
+    // Fonction pour créer un nouvel enseignant
     const handleCreateTeacher = async (e) => {
         e.preventDefault();
         try {
-            await createTeacher(teacherForm);
+            await createTeacher(teacherForm); // Appel API pour créer l'enseignant
             alert('Teacher created successfully');
             setShowTeacherForm(false);
+            // Réinitialiser le formulaire
             setTeacherForm({
                 name: '',
                 email: '',
                 password: '',
                 password_confirmation: ''
             });
-            loadUsers();
+            loadUsers(); // Recharger la liste des utilisateurs
         } catch (error) {
             alert(error.message || 'Error creating teacher');
         }
     };
 
+    // Fonction pour supprimer un utilisateur
     const handleDeleteUser = async (userId) => {
         if (window.confirm('Are you sure you want to delete this user?')) {
             try {
-                await deleteUser(userId);
+                await deleteUser(userId); // Appel API pour supprimer l'utilisateur
                 alert('User deleted successfully');
-                loadUsers();
+                loadUsers(); // Recharger la liste
             } catch (error) {
                 alert('Error deleting user');
             }
         }
     };
 
+    // Fonction pour gérer la déconnexion
     const handleLogout = async () => {
         if (window.confirm('Are you sure you want to logout?')) {
             try {
-                await logout();
-                navigate('/login');
+                await logout(); // Appel API de déconnexion
+                navigate('/login'); // Redirection vers la page de connexion
             } catch (error) {
                 console.error('Logout error:', error);
             }
         }
     };
 
+    // Fonction pour retourner au tableau de bord principal
     const handleBackToDashboard = () => {
         navigate('/dashboard');
     };
 
+    // Vérification des privilèges administrateur
     if (currentUser?.role !== 'admin') {
         return (
             <div className="container mt-4">
                 <div className="alert alert-danger">
-                    Access denied. Admin privileges required.
+                    Access denied. Admin privileges required. {/* Accès refusé si non-admin */}
                 </div>
             </div>
         );
@@ -96,7 +105,7 @@ const AdminDashboard = () => {
             <div className="row">
                 <div className="col-12">
                     <div className="card shadow">
-                        {/* Header */}
+                        {/* En-tête du tableau de bord administrateur */}
                         <div className="card-header bg-dark text-white d-flex justify-content-between align-items-center">
                             <div>
                                 <h2 className="mb-0">
@@ -106,6 +115,7 @@ const AdminDashboard = () => {
                                 <small className="opacity-75">Manage all platform users</small>
                             </div>
                             <div>
+                                {/* Bouton retour au tableau de bord principal */}
                                 <button 
                                     className="btn btn-outline-light me-2"
                                     onClick={handleBackToDashboard}
@@ -113,6 +123,7 @@ const AdminDashboard = () => {
                                     <i className="fas fa-arrow-left me-2"></i>
                                     Back to Dashboard
                                 </button>
+                                {/* Bouton pour afficher le formulaire d'ajout d'enseignant */}
                                 <button 
                                     className="btn btn-outline-light me-2"
                                     onClick={() => setShowTeacherForm(!showTeacherForm)}
@@ -120,6 +131,7 @@ const AdminDashboard = () => {
                                     <i className="fas fa-plus me-2"></i>
                                     Add Teacher
                                 </button>
+                                {/* Bouton de déconnexion */}
                                 <button 
                                     className="btn btn-outline-warning"
                                     onClick={handleLogout}
@@ -130,7 +142,7 @@ const AdminDashboard = () => {
                             </div>
                         </div>
                         
-                        {/* Teacher Creation Form */}
+                        {/* Formulaire de création d'enseignant (conditionnel) */}
                         {showTeacherForm && (
                             <div className="card-body border-bottom bg-light">
                                 <div className="row">
@@ -140,6 +152,7 @@ const AdminDashboard = () => {
                                                 <i className="fas fa-chalkboard-teacher me-2"></i>
                                                 Create New Teacher
                                             </h4>
+                                            {/* Bouton pour fermer le formulaire */}
                                             <button 
                                                 type="button" 
                                                 className="btn-close" 
@@ -224,6 +237,7 @@ const AdminDashboard = () => {
                         )}
 
                         <div className="card-body">
+                            {/* Cartes de statistiques des utilisateurs */}
                             <div className="row mb-4">
                                 <div className="col-md-3">
                                     <div className="card bg-danger text-white">
@@ -263,8 +277,9 @@ const AdminDashboard = () => {
                                 </div>
                             </div>
 
-                            {/* Users Table */}
+                            {/* Tableau des utilisateurs */}
                             {loading ? (
+                                // Indicateur de chargement
                                 <div className="text-center py-5">
                                     <div className="spinner-border text-primary" role="status">
                                         <span className="visually-hidden">Loading...</span>
@@ -290,6 +305,7 @@ const AdminDashboard = () => {
                                                     <td><strong>#{user.id}</strong></td>
                                                     <td>
                                                         <div className="d-flex align-items-center">
+                                                            {/* Icône selon le rôle */}
                                                             <i className={`fas fa-${
                                                                 user.role === 'admin' ? 'crown text-danger' : 
                                                                 user.role === 'teacher' ? 'chalkboard-teacher text-warning' : 'user-graduate text-info'
@@ -299,6 +315,7 @@ const AdminDashboard = () => {
                                                     </td>
                                                     <td>{user.email}</td>
                                                     <td>
+                                                        {/* Badge coloré selon le rôle */}
                                                         <span className={`badge ${
                                                             user.role === 'admin' ? 'bg-danger' : 
                                                             user.role === 'teacher' ? 'bg-warning' : 'bg-info'
@@ -312,6 +329,7 @@ const AdminDashboard = () => {
                                                     </td>
                                                     <td>
                                                         <small>
+                                                            {/* Formatage de la date de création */}
                                                             {new Date(user.created_at).toLocaleDateString('en-US', {
                                                                 year: 'numeric',
                                                                 month: 'short',
@@ -320,6 +338,7 @@ const AdminDashboard = () => {
                                                         </small>
                                                     </td>
                                                     <td>
+                                                        {/* Bouton de suppression (désactivé pour les admins) */}
                                                         <button 
                                                             className="btn btn-danger btn-sm"
                                                             onClick={() => handleDeleteUser(user.id)}
@@ -337,6 +356,7 @@ const AdminDashboard = () => {
                                 </div>
                             )}
 
+                            {/* Message si aucun utilisateur trouvé */}
                             {users.length === 0 && !loading && (
                                 <div className="text-center py-5">
                                     <i className="fas fa-users fa-3x text-muted mb-3"></i>

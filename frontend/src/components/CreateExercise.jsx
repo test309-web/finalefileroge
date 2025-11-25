@@ -6,43 +6,49 @@ import { getCurrentUser } from '../services/authService';
 
 const CreateExercise = () => {
     const navigate = useNavigate();
+    
+    // État pour stocker les données du formulaire d'exercice
     const [formData, setFormData] = useState({
-        title: '',
-        description: '',
-        content: '',
-        solution: '',
-        level: 'beginner',
-        points: 10,
-        lesson_id: ''
+        title: '', // Titre de l'exercice
+        description: '', // Description de l'exercice
+        content: '', // Contenu/énoncé de l'exercice
+        solution: '', // Solution de l'exercice
+        level: 'beginner', // Niveau de difficulté (défaut: débutant)
+        points: 10, // Points attribués (défaut: 10)
+        lesson_id: '' // Leçon associée (optionnelle)
     });
-    const [lessons, setLessons] = useState([]);
-    const [validationErrors, setValidationErrors] = useState({});
-    const [loading, setLoading] = useState(false);
-    const [currentUser, setCurrentUser] = useState(null);
+    
+    const [lessons, setLessons] = useState([]); // Liste des leçons disponibles
+    const [validationErrors, setValidationErrors] = useState({}); // Erreurs de validation
+    const [loading, setLoading] = useState(false); // État de chargement
+    const [currentUser, setCurrentUser] = useState(null); // Utilisateur connecté
 
+    // Effet pour charger l'utilisateur et les leçons au montage du composant
     useEffect(() => {
-        const user = getCurrentUser();
+        const user = getCurrentUser(); // Récupérer l'utilisateur connecté
         setCurrentUser(user);
-        loadLessons();
+        loadLessons(); // Charger les leçons disponibles
     }, []);
 
+    // Fonction pour charger les leçons selon le rôle de l'utilisateur
     const loadLessons = async () => {
         try {
             let lessonsData;
             if (currentUser?.role === 'teacher') {
-                // للمعلم: جلب فقط دروسه
+                // Pour l'enseignant : récupérer uniquement ses propres leçons
                 const response = await fetch('http://127.0.0.1:8000/api/teacher/lessons', {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`, // Token d'authentification
                         'Content-Type': 'application/json'
                     }
                 });
                 lessonsData = await response.json();
             } else {
-                // للطالب أو المدير: جلب جميع الدروس
+                // Pour l'admin ou autres rôles : récupérer toutes les leçons
                 lessonsData = await getLessons();
             }
             
+            // Mettre à jour la liste des leçons si la requête réussit
             if (lessonsData.status === 'success') {
                 setLessons(lessonsData.data || []);
             }
@@ -51,27 +57,30 @@ const CreateExercise = () => {
         }
     };
 
+    // Fonction pour retourner au tableau de bord
     const handleBack = () => {
         navigate('/dashboard');
     };
 
+    // Fonction pour gérer les changements dans les champs du formulaire
     const handleChange = (e) => {
         setFormData({...formData, [e.target.name]: e.target.value });
     }
 
+    // Fonction pour soumettre le formulaire de création d'exercice
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setValidationErrors({});
+        setValidationErrors({}); // Réinitialiser les erreurs
         
         try {
-            await createExercise(formData);
-            navigate('/exercises');
+            await createExercise(formData); // Appel API pour créer l'exercice
+            navigate('/exercises'); // Redirection vers la liste des exercices
         } catch (error) {
             if (error.errors) {
-                setValidationErrors(error.errors);
+                setValidationErrors(error.errors); // Afficher les erreurs de validation
             } else {
-                alert(error.message || 'Failed to create exercise');
+                alert(error.message || 'Failed to create exercise'); // Erreur générale
             }
         } finally {
             setLoading(false);
@@ -82,6 +91,7 @@ const CreateExercise = () => {
         <div className="container mt-4">
             <div className="row justify-content-center">
                 <div className="col-12 col-md-8 col-lg-6">
+                    {/* Bouton de retour */}
                     <button 
                         className="btn btn-outline-secondary mb-3"
                         onClick={handleBack}
@@ -90,6 +100,7 @@ const CreateExercise = () => {
                         Back to Dashboard
                     </button>
 
+                    {/* Carte principale du formulaire */}
                     <div className="card shadow">
                         <div className="card-header bg-success text-white">
                             <h2 className="mb-0">
@@ -99,6 +110,7 @@ const CreateExercise = () => {
                         </div>
                         <div className="card-body p-4">
                             <form onSubmit={handleSubmit}>
+                                {/* Champ : Titre de l'exercice */}
                                 <div className="mb-3">
                                     <label htmlFor="title" className="form-label">Title</label>
                                     <input 
@@ -115,6 +127,7 @@ const CreateExercise = () => {
                                     }
                                 </div>
                                 
+                                {/* Champ : Description de l'exercice */}
                                 <div className="mb-3">
                                     <label htmlFor="description" className="form-label">Description</label>
                                     <textarea 
@@ -131,6 +144,7 @@ const CreateExercise = () => {
                                     }
                                 </div>
                                 
+                                {/* Champ : Contenu/énoncé de l'exercice */}
                                 <div className="mb-3">
                                     <label htmlFor="content" className="form-label">Exercise Content</label>
                                     <textarea 
@@ -147,6 +161,7 @@ const CreateExercise = () => {
                                     }
                                 </div>
 
+                                {/* Champ : Solution de l'exercice */}
                                 <div className="mb-3">
                                     <label htmlFor="solution" className="form-label">Solution</label>
                                     <textarea 
@@ -163,6 +178,7 @@ const CreateExercise = () => {
                                     }
                                 </div>
 
+                                {/* Sélecteur : Niveau de difficulté */}
                                 <div className="mb-3">
                                     <label htmlFor="level" className="form-label">Level</label>
                                     <select 
@@ -177,6 +193,7 @@ const CreateExercise = () => {
                                     </select>
                                 </div>
 
+                                {/* Champ : Points attribués */}
                                 <div className="mb-3">
                                     <label htmlFor="points" className="form-label">Points</label>
                                     <input 
@@ -194,6 +211,7 @@ const CreateExercise = () => {
                                     }
                                 </div>
 
+                                {/* Sélecteur : Leçon associée (optionnelle) */}
                                 <div className="mb-4">
                                     <label htmlFor="lesson_id" className="form-label">Related Lesson (Optional)</label>
                                     <select 
@@ -205,7 +223,7 @@ const CreateExercise = () => {
                                         <option value="">Select a lesson (optional)</option>
                                         {lessons.map(lesson => (
                                             <option key={lesson.id} value={lesson.id}>
-                                                {lesson.title} - {lesson.level}
+                                                {lesson.title} - {lesson.level} {/* Affichage titre et niveau */}
                                             </option>
                                         ))}
                                     </select>
@@ -214,6 +232,7 @@ const CreateExercise = () => {
                                     }
                                 </div>
                                 
+                                {/* Boutons d'action */}
                                 <div className="d-grid gap-2">
                                     <button 
                                         type="submit" 

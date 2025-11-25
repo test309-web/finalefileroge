@@ -3,9 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { getCurrentUser, logout } from '../services/authService';
 
 const Dashboard = () => {
-    const currentUser = getCurrentUser();
+    const currentUser = getCurrentUser(); // Récupérer l'utilisateur connecté
     const navigate = useNavigate();
 
+    // Fonction pour gérer la déconnexion
     const handleLogout = async () => {
         if (window.confirm('Are you sure you want to logout?')) {
             try {
@@ -17,23 +18,26 @@ const Dashboard = () => {
         }
     };
 
+    // Fonction pour retourner au tableau de bord
     const handleBack = () => {
         navigate('/dashboard');
     };
 
+    // Fonction pour obtenir le message de bienvenue selon le rôle
     const getWelcomeMessage = () => {
         switch(currentUser?.role) {
             case 'admin':
-                return 'Administrator Dashboard - Manage the entire platform';
+                return 'Administrator Dashboard - Manage the entire platform'; // Tableau de bord administrateur
             case 'teacher':
-                return 'Teacher Dashboard - Create and manage your lessons and exercises';
+                return 'Teacher Dashboard - Create and manage your lessons and exercises'; // Tableau de bord enseignant
             case 'student':
-                return 'Student Dashboard - Explore lessons and practice exercises';
+                return 'Student Dashboard - Explore lessons and practice exercises'; // Tableau de bord étudiant
             default:
-                return 'Welcome to your dashboard';
+                return 'Welcome to your dashboard'; // Message par défaut
         }
     };
 
+    // Fonction pour obtenir les statistiques selon le rôle
     const getStats = () => {
         const stats = {
             admin: [
@@ -56,17 +60,19 @@ const Dashboard = () => {
             ]
         };
 
-        return stats[currentUser?.role] || [];
+        return stats[currentUser?.role] || []; // Retourner les stats selon le rôle ou tableau vide
     };
 
     return (
         <div className="container mt-4">
             <div className="row">
                 <div className="col-12">
+                    {/* En-tête du tableau de bord */}
                     <div className="card bg-light border-0 mb-4">
                         <div className="card-body">
                             <div className="row align-items-center">
                                 <div className="col-md-8">
+                                    {/* Bouton retour */}
                                     <button 
                                         className="btn btn-outline-secondary mb-3"
                                         onClick={handleBack}
@@ -81,6 +87,7 @@ const Dashboard = () => {
                                         {getWelcomeMessage()}
                                     </p>
                                     <div className="mt-3">
+                                        {/* Badge du rôle utilisateur */}
                                         <span className={`badge bg-${
                                             currentUser?.role === 'admin' ? 'danger' : 
                                             currentUser?.role === 'teacher' ? 'warning' : 'info'
@@ -94,6 +101,7 @@ const Dashboard = () => {
                                     </div>
                                 </div>
                                 <div className="col-md-4 text-end">
+                                    {/* Bouton de déconnexion */}
                                     <button 
                                         className="btn btn-outline-danger btn-lg"
                                         onClick={handleLogout}
@@ -106,6 +114,7 @@ const Dashboard = () => {
                         </div>
                     </div>
 
+                    {/* Section des statistiques */}
                     <div className="row g-4 mb-5">
                         {getStats().map((stat, index) => (
                             <div key={index} className="col-md-6 col-lg-3">
@@ -122,6 +131,7 @@ const Dashboard = () => {
                         ))}
                     </div>
 
+                    {/* Section des actions rapides */}
                     <div className="row">
                         <div className="col-12">
                             <div className="card border-0 shadow-sm">
@@ -133,6 +143,7 @@ const Dashboard = () => {
                                 </div>
                                 <div className="card-body">
                                     <div className="row g-4">
+                                        {/* Actions pour l'administrateur */}
                                         {currentUser?.role === 'admin' && (
                                             <>
                                                 <div className="col-md-4">
@@ -168,8 +179,10 @@ const Dashboard = () => {
                                             </>
                                         )}
                                         
+                                        {/* Actions pour l'enseignant */}
                                         {currentUser?.role === 'teacher' && (
                                             <>
+                                                {/* Créer une leçon */}
                                                 <div className="col-md-4">
                                                     <Link to="/lessons/create" className="card text-decoration-none h-100 border-0 shadow-hover">
                                                         <div className="card-body text-center p-4">
@@ -180,6 +193,7 @@ const Dashboard = () => {
                                                         </div>
                                                     </Link>
                                                 </div>
+                                                {/* Créer un exercice */}
                                                 <div className="col-md-4">
                                                     <Link to="/exercises/create" className="card text-decoration-none h-100 border-0 shadow-hover">
                                                         <div className="card-body text-center p-4">
@@ -190,6 +204,7 @@ const Dashboard = () => {
                                                         </div>
                                                     </Link>
                                                 </div>
+                                                {/* Gérer mes leçons */}
                                                 <div className="col-md-4">
                                                     <Link to="/lessons" className="card text-decoration-none h-100 border-0 shadow-hover">
                                                         <div className="card-body text-center p-4">
@@ -200,9 +215,34 @@ const Dashboard = () => {
                                                         </div>
                                                     </Link>
                                                 </div>
+                                                
+                                                {/* Section ajoutée : Gérer les exercices */}
+                                                <div className="col-md-4">
+                                                    <Link to="/exercises" className="card text-decoration-none h-100 border-0 shadow-hover">
+                                                        <div className="card-body text-center p-4">
+                                                            <i className="fas fa-cogs fa-3x text-warning mb-3"></i>
+                                                            <h5 className="card-title">Manage Exercises</h5>
+                                                            <p className="card-text text-muted">View, edit and delete your exercises</p>
+                                                            <span className="btn btn-outline-warning btn-sm">Manage Exercises</span>
+                                                        </div>
+                                                    </Link>
+                                                </div>
+                                                
+                                                {/* Analytics des exercices */}
+                                                <div className="col-md-4">
+                                                    <div className="card text-decoration-none h-100 border-0 shadow-hover bg-light">
+                                                        <div className="card-body text-center p-4">
+                                                            <i className="fas fa-chart-bar fa-3x text-secondary mb-3"></i>
+                                                            <h5 className="card-title">Exercise Analytics</h5>
+                                                            <p className="card-text text-muted">View performance and completion statistics</p>
+                                                            <span className="btn btn-outline-secondary btn-sm">View Analytics</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </>
                                         )}
                                         
+                                        {/* Actions pour l'étudiant */}
                                         {currentUser?.role === 'student' && (
                                             <>
                                                 <div className="col-md-4">
@@ -243,6 +283,7 @@ const Dashboard = () => {
                         </div>
                     </div>
 
+                    {/* Section activité récente */}
                     <div className="row mt-5">
                         <div className="col-12">
                             <div className="card border-0 shadow-sm">
@@ -268,6 +309,25 @@ const Dashboard = () => {
                                             </div>
                                             <small className="text-muted">Today</small>
                                         </div>
+                                        {/* Activités spécifiques à l'enseignant */}
+                                        {currentUser?.role === 'teacher' && (
+                                            <>
+                                                <div className="list-group-item d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <i className="fas fa-tasks text-warning me-2"></i>
+                                                        <span>You have exercises to manage</span>
+                                                    </div>
+                                                    <small className="text-muted">Click on Manage Exercises</small>
+                                                </div>
+                                                <div className="list-group-item d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <i className="fas fa-edit text-info me-2"></i>
+                                                        <span>You can edit and delete your exercises</span>
+                                                    </div>
+                                                    <small className="text-muted">Available now</small>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </div>

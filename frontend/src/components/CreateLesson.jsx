@@ -14,7 +14,7 @@ const CreateLesson = () => {
     const [loading, setLoading] = useState(false);
 
     const handleBack = () => {
-        navigate('/dashboard'); // الرجوع للصفحة الرئيسية مباشرة
+        navigate('/dashboard'); 
     };
 
     const handleChange = (e) => {

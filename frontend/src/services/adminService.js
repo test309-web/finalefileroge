@@ -1,5 +1,6 @@
 import API from './api';
 
+// Fonction pour récupérer tous les utilisateurs (admin seulement)
 export const getAllUsers = async () => {
     try {
         const response = await API.get('/admin/users');
@@ -9,6 +10,7 @@ export const getAllUsers = async () => {
     }
 };
 
+// Fonction pour créer un nouvel utilisateur (admin seulement)
 export const createUser = async (userData) => {
     try {
         const response = await API.post('/admin/users', userData);
@@ -18,6 +20,7 @@ export const createUser = async (userData) => {
     }
 };
 
+// Fonction pour supprimer un utilisateur (admin seulement)
 export const deleteUser = async (id) => {
     try {
         const response = await API.delete(`/admin/users/${id}`);

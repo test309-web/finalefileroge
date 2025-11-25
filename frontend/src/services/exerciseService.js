@@ -1,5 +1,6 @@
 import API from './api';
 
+// Fonction pour récupérer tous les exercices
 export const getExercises = async () => {
     try {
         const response = await API.get('/exercises');
@@ -9,6 +10,7 @@ export const getExercises = async () => {
     }
 };
 
+// Fonction pour récupérer un exercice spécifique par son ID
 export const getExercise = async (id) => {
     try {
         const response = await API.get(`/exercises/${id}`);
@@ -18,6 +20,7 @@ export const getExercise = async (id) => {
     }
 };
 
+// Fonction pour créer un nouvel exercice
 export const createExercise = async (exerciseData) => {
     try {
         const response = await API.post('/exercises', exerciseData);
@@ -27,6 +30,7 @@ export const createExercise = async (exerciseData) => {
     }
 };
 
+// Fonction pour mettre à jour un exercice existant
 export const updateExercise = async (id, exerciseData) => {
     try {
         const response = await API.put(`/exercises/${id}`, exerciseData);
@@ -36,6 +40,7 @@ export const updateExercise = async (id, exerciseData) => {
     }
 };
 
+// Fonction pour supprimer un exercice
 export const deleteExercise = async (id) => {
     try {
         const response = await API.delete(`/exercises/${id}`);
@@ -45,6 +50,7 @@ export const deleteExercise = async (id) => {
     }
 };
 
+// Fonction pour rechercher des exercices avec des critères spécifiques
 export const searchExercises = async (searchData) => {
     try {
         const response = await API.get('/exercises/search/by', { params: searchData });
@@ -54,6 +60,7 @@ export const searchExercises = async (searchData) => {
     }
 };
 
+// Fonction pour attribuer des points pour un exercice
 export const assignPoints = async (pointsData) => {
     try {
         const response = await API.post('/exercises/assign-points', pointsData);
